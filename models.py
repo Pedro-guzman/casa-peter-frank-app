@@ -22,3 +22,13 @@ class ServicioDiarioModel(Base):
     precio_cobrado = Column(Float, nullable=False)
     total_cobrado_neto = Column(Float, nullable=False)
     fecha_hora = Column(DateTime(timezone=True), server_default=func.now())
+
+class CitaModel(Base):
+    __tablename__ = "citas"
+    id = Column(Integer, primary_key=True, index=True)
+    cliente_nombre = Column(String, nullable=False)
+    fecha = Column(String, nullable=False)
+    hora = Column(String, nullable=False)
+    anticipo = Column(String, nullable=True)
+    barbero_id = Column(Integer, ForeignKey("barberos.id"), nullable=True)
+    
