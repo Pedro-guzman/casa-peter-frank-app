@@ -135,11 +135,16 @@ def listar_servicios_diarios(
     datos_formateados = []
     for reg in resultados:
         # Filtrado temporal inteligente
-        if filtro_tipo == "dia" and fecha_ref:
-            if reg.fecha_hora.strftime("%Y-%m-%d") != fecha_ref:
-                continue
+        if filtro_tipo == "dia":
+            if fecha_ref:
+                # Comparamos estrictamente la fecha del registro con la fecha seleccionada
+                if reg.fecha_hora.strftime("%Y-%m-%d") != fecha_ref:
+                    continue
+            else:
+                # Si no se mandó fecha de referencia, usamos el día de hoy en UTC
+                if reg.fecha_hora.strftime("%Y-%m-%d") != datetime.utcnow().strftime("%Y-%m-%d"):
+                    continue
         elif filtro_tipo == "semana":
-            # Semana actual o semana de la fecha de referencia (lunes a domingo)
             start_week = ref_date - timedelta(days=ref_date.weekday())
             end_week = start_week + timedelta(days=6)
             if not (start_week.date() <= reg.fecha_hora.date() <= end_week.date()):
@@ -153,7 +158,6 @@ def listar_servicios_diarios(
             a = anio if anio else ref_date.year
             if reg.fecha_hora.year != a:
                 continue
-        # Compatibilidad con filtros anteriores (mes/anio sueltos)
         elif mes and reg.fecha_hora.month != mes:
             continue
         elif anio and reg.fecha_hora.year != anio:
@@ -176,7 +180,6 @@ def listar_servicios_diarios(
         })
         
     return datos_formateados
-
 
 # --- CITAS ---
 
