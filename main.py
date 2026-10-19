@@ -11,18 +11,40 @@ from typing import Optional
 import io
 import csv
 
+# Crear las tablas físicas si no existen
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Casa Peter Frank")
 templates = Jinja2Templates(directory="templates")
 
-class ServicioDiarioCreate(BaseModel):
-    cliente_nombre: str
-    barbero_id: int
-    servicio_id: int
-    metodo_pago: str
-    precio_cobrado: float
-    fecha_hora: Optional[datetime] = None
+# Evento de inicio para poblar datos semilla automáticamente si está vacío
+@app.on_event("startup")
+def startup_event():
+    db = SessionLocal() if 'SessionLocal' in globals() else next(get_db())
+    try:
+        # Verificar si hay barberos, si no, crearlos
+        if db.query(BarberoModel).count() == 0:
+            for b in ["Peter", "Frank"]:
+                db.add(BarberoModel(nombre=b))
+            print("Barberos semilla creados en producción.")
+
+        # Verificar si hay catálogo, si no, crearlo
+        if db.query(ServicioCatalogoModel).count() == 0:
+            servicios = [
+                "Corte", "Corte + barba", "Corte + barba + ceja",
+                "Corte + ceja", "Barba + ceja", "Corte a tijera", "Tapper"
+            ]
+            for s in servicios:
+                db.add(ServicioCatalogoModel(nombre_servicio=s))
+            print("Catálogo semilla creado en producción.")
+            
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"Error en startup: {e}")
+    finally:
+        db.close()
+
 
 @app.get("/", include_in_schema=False)
 def redirectToApp():
