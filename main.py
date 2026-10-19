@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timedelta
 from database import get_db, SessionLocal, engine, Base
 from models import BarberoModel, ServicioCatalogoModel, ServicioDiarioModel, CitaModel
 from pydantic import BaseModel
@@ -116,16 +116,53 @@ def eliminar_servicio_diario(id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"mensaje": "Registro eliminado con éxito"}
 
+from datetime import datetime, timedelta
+
 @app.get("/servicios-diarios/")
-def listar_servicios_diarios(db: Session = Depends(get_db), mes: Optional[int] = Query(None), anio: Optional[int] = Query(None)):
-    resultados = db.query(ServicioDiarioModel).all()
-    datos = []
+def listar_servicios_diarios(
+    db: Session = Depends(get_db),
+    filtro_tipo: Optional[str] = Query(None, description="dia, semana, mes, anio"),
+    fecha_ref: Optional[str] = Query(None, description="Fecha de referencia YYYY-MM-DD"),
+    mes: Optional[int] = Query(None, description="Mes (1-12)"),
+    anio: Optional[int] = Query(None, description="Año (ej. 2026)")
+):
+    query = db.query(ServicioDiarioModel)
+    resultados = query.all()
+    
+    # Determinar fecha de referencia actual si no se provee
+    ref_date = datetime.strptime(fecha_ref, "%Y-%m-%d") if fecha_ref else datetime.utcnow()
+
+    datos_formateados = []
     for reg in resultados:
-        if mes and reg.fecha_hora.month != mes: continue
-        if anio and reg.fecha_hora.year != anio: continue
+        # Filtrado temporal inteligente
+        if filtro_tipo == "dia" and fecha_ref:
+            if reg.fecha_hora.strftime("%Y-%m-%d") != fecha_ref:
+                continue
+        elif filtro_tipo == "semana":
+            # Semana actual o semana de la fecha de referencia (lunes a domingo)
+            start_week = ref_date - timedelta(days=ref_date.weekday())
+            end_week = start_week + timedelta(days=6)
+            if not (start_week.date() <= reg.fecha_hora.date() <= end_week.date()):
+                continue
+        elif filtro_tipo == "mes":
+            m = mes if mes else ref_date.month
+            a = anio if anio else ref_date.year
+            if reg.fecha_hora.month != m or reg.fecha_hora.year != a:
+                continue
+        elif filtro_tipo == "anio":
+            a = anio if anio else ref_date.year
+            if reg.fecha_hora.year != a:
+                continue
+        # Compatibilidad con filtros anteriores (mes/anio sueltos)
+        elif mes and reg.fecha_hora.month != mes:
+            continue
+        elif anio and reg.fecha_hora.year != anio:
+            continue
+            
         barbero = db.query(BarberoModel).filter_by(id=reg.barbero_id).first()
         servicio = db.query(ServicioCatalogoModel).filter_by(id=reg.servicio_id).first()
-        datos.append({
+        
+        datos_formateados.append({
             "id": reg.id,
             "fecha_hora": reg.fecha_hora.strftime("%Y-%m-%d %H:%M"),
             "cliente_nombre": reg.cliente_nombre,
@@ -137,7 +174,9 @@ def listar_servicios_diarios(db: Session = Depends(get_db), mes: Optional[int] =
             "precio_cobrado": reg.precio_cobrado,
             "total_cobrado_neto": reg.total_cobrado_neto
         })
-    return datos
+        
+    return datos_formateados
+
 
 # --- CITAS ---
 

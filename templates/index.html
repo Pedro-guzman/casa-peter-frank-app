@@ -82,19 +82,50 @@
                 <div id="mensaje-alerta" class="mt-4 hidden p-3 rounded-lg text-xs text-center"></div>
             </section>
 
-            <!-- Historial -->
-            <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-2">
-                <div class="flex justify-between items-center mb-4">
+            <!-- Historial y Totales -->
+            <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-2 space-y-6">
+                
+                <!-- Panel de Totales Resumen -->
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="bg-stone-50 border border-stone-200 p-3 rounded-xl">
+                        <span class="block text-[10px] uppercase font-semibold text-stone-500">Efectivo</span>
+                        <span id="total-efectivo" class="text-base font-bold text-stone-900">$0.00</span>
+                    </div>
+                    <div class="bg-stone-50 border border-stone-200 p-3 rounded-xl">
+                        <span class="block text-[10px] uppercase font-semibold text-stone-500">Tarjeta (Neto)</span>
+                        <span id="total-tarjeta" class="text-base font-bold text-amber-700">$0.00</span>
+                    </div>
+                    <div class="bg-emerald-50 border border-emerald-200 p-3 rounded-xl">
+                        <span class="block text-[10px] uppercase font-semibold text-emerald-700">Total Neto</span>
+                        <span id="total-neto-general" class="text-base font-bold text-emerald-800">$0.00</span>
+                    </div>
+                </div>
+
+                <!-- Filtros Avanzados -->
+                <div class="flex flex-wrap justify-between items-center gap-2 border-b border-stone-200 pb-4">
                     <h2 class="text-base font-medium text-stone-900">Historial de Servicios</h2>
-                    <div class="flex gap-2">
-                        <select id="filtro-mes" class="px-2 py-1 text-xs border border-stone-300 rounded-lg bg-white">
-                            <option value="">Todos los meses</option>
+                    <div class="flex flex-wrap gap-2 items-center">
+                        <select id="filtro-tipo" onchange="toggleFiltroCampos()" class="px-2 py-1 text-xs border border-stone-300 rounded-lg bg-white">
+                            <option value="todos">Todo el historial</option>
+                            <option value="dia">Por Día</option>
+                            <option value="semana">Semana Actual</option>
+                            <option value="mes">Por Mes</option>
+                            <option value="anio">Por Año</option>
+                        </select>
+
+                        <!-- Input dinámico según tipo de filtro -->
+                        <input type="date" id="filtro-input-fecha" class="hidden px-2 py-1 text-xs border border-stone-300 rounded-lg bg-white">
+                        
+                        <select id="filtro-mes" class="hidden px-2 py-1 text-xs border border-stone-300 rounded-lg bg-white">
                             <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
                             <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
                             <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
                             <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
                         </select>
-                        <button onclick="cargarHistorial()" class="px-3 py-1 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-medium rounded-lg transition">Filtrar</button>
+
+                        <input type="number" id="filtro-anio" placeholder="Ej. 2026" class="hidden w-20 px-2 py-1 text-xs border border-stone-300 rounded-lg bg-white">
+
+                        <button onclick="cargarHistorial()" class="px-3 py-1 bg-stone-900 hover:bg-stone-800 text-white text-xs font-medium rounded-lg transition">Aplicar</button>
                     </div>
                 </div>
 
@@ -209,12 +240,14 @@
             const hoyFecha = now.toISOString().slice(0, 10);
             document.getElementById("cita_fecha").value = hoyFecha;
             document.getElementById("filtro-fecha-citas").value = hoyFecha;
+            document.getElementById("filtro-input-fecha").value = hoyFecha;
+            document.getElementById("filtro-mes").value = now.getMonth() + 1;
+            document.getElementById("filtro-anio").value = now.getFullYear();
 
             await cargarSelects();
             await cargarHistorial();
             await cargarDisponibilidadDia();
 
-            // Formulario Servicio (Crear o Editar)
             document.getElementById("form-servicio").addEventListener("submit", async (e) => {
                 e.preventDefault();
                 const editId = document.getElementById("edit_servicio_id").value;
@@ -246,7 +279,6 @@
                 }
             });
 
-            // Formulario Cita (Crear o Editar)
             document.getElementById("form-cita").addEventListener("submit", async (e) => {
                 e.preventDefault();
                 const editId = document.getElementById("edit_cita_id").value;
@@ -278,6 +310,26 @@
                 }
             });
         });
+
+        function toggleFiltroCampos() {
+            const tipo = document.getElementById("filtro-tipo").value;
+            const inputFecha = document.getElementById("filtro-input-fecha");
+            const selectMes = document.getElementById("filtro-mes");
+            const inputAnio = document.getElementById("filtro-anio");
+
+            inputFecha.classList.add("hidden");
+            selectMes.classList.add("hidden");
+            inputAnio.classList.add("hidden");
+
+            if (tipo === "dia") {
+                inputFecha.classList.remove("hidden");
+            } else if (tipo === "mes") {
+                selectMes.classList.remove("hidden");
+                inputAnio.classList.remove("hidden");
+            } else if (tipo === "anio") {
+                inputAnio.classList.remove("hidden");
+            }
+        }
 
         function cambiarVista(vista) {
             const vServicios = document.getElementById("vista-servicios");
@@ -318,22 +370,49 @@
             catalogo.forEach(s => sSelect.innerHTML += `<option value="${s.id}">${s.nombre_servicio}</option>`);
         }
 
-                async function cargarHistorial() {
-            const mes = document.getElementById("filtro-mes").value;
-            let url = "/servicios-diarios/";
-            if (mes) url += `?mes=${mes}`;
+        async function cargarHistorial() {
+            const tipo = document.getElementById("filtro-tipo").value;
+            let url = "/servicios-diarios/?";
+
+            if (tipo === "dia") {
+                const fecha = document.getElementById("filtro-input-fecha").value;
+                url += `filtro_tipo=dia&fecha_ref=${fecha}`;
+            } else if (tipo === "semana") {
+                url += `filtro_tipo=semana`;
+            } else if (tipo === "mes") {
+                const mes = document.getElementById("filtro-mes").value;
+                const anio = document.getElementById("filtro-anio").value;
+                url += `filtro_tipo=mes&mes=${mes}&anio=${anio}`;
+            } else if (tipo === "anio") {
+                const anio = document.getElementById("filtro-anio").value;
+                url += `filtro_tipo=anio&anio=${anio}`;
+            }
 
             const res = await fetch(url);
-            window.listaServicios = await res.json(); // Guardamos en memoria global para editar fácil
+            window.listaServicios = await res.json();
             const tbody = document.getElementById("tabla-historial");
             
+            let totalEfectivo = 0;
+            let totalTarjeta = 0;
+            let totalNetoGeneral = 0;
+
             if (window.listaServicios.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="py-4 text-center text-stone-400">No hay registros.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" class="py-4 text-center text-stone-400">No hay registros para este filtro.</td></tr>`;
+                document.getElementById("total-efectivo").textContent = "$0.00";
+                document.getElementById("total-tarjeta").textContent = "$0.00";
+                document.getElementById("total-neto-general").textContent = "$0.00";
                 return;
             }
 
             tbody.innerHTML = "";
             window.listaServicios.forEach(r => {
+                if (r.metodo_pago.toLowerCase() === 'efectivo') {
+                    totalEfectivo += r.total_cobrado_neto;
+                } else if (r.metodo_pago.toLowerCase() === 'tarjeta') {
+                    totalTarjeta += r.total_cobrado_neto;
+                }
+                totalNetoGeneral += r.total_cobrado_neto;
+
                 tbody.innerHTML += `
                     <tr class="hover:bg-stone-50 transition">
                         <td class="py-2.5 px-2">${r.fecha_hora}</td>
@@ -348,8 +427,12 @@
                     </tr>
                 `;
             });
-        }
 
+            // Actualizar tarjetas de resumen
+            document.getElementById("total-efectivo").textContent = `$${totalEfectivo.toFixed(2)}`;
+            document.getElementById("total-tarjeta").textContent = `$${totalTarjeta.toFixed(2)}`;
+            document.getElementById("total-neto-general").textContent = `$${totalNetoGeneral.toFixed(2)}`;
+        }
 
         function prepararEdicionServicio(id) {
             const item = window.listaServicios.find(s => s.id === id);
@@ -361,8 +444,6 @@
             document.getElementById("servicio_id").value = item.servicio_id;
             document.getElementById("metodo_pago").value = item.metodo_pago;
             document.getElementById("precio_cobrado").value = item.precio_cobrado;
-            
-            // Ajustar fecha para input datetime-local format "YYYY-MM-DDTHH:MM"
             document.getElementById("fecha_hora").value = item.fecha_hora.replace(" ", "T");
 
             document.getElementById("titulo-form-servicio").textContent = "Editar Servicio";
@@ -381,16 +462,6 @@
             const now = new Date();
             now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
             document.getElementById("fecha_hora").value = now.toISOString().slice(0, 16);
-        }
-
-        async function eliminarServicio(id) {
-            if (!confirm("¿Estás seguro de eliminar este registro de ingreso?")) return;
-            const res = await fetch(`/servicios-diarios/${id}`, { method: "DELETE" });
-            if (res.ok) {
-                cargarHistorial();
-            } else {
-                alert("Error al eliminar el registro");
-            }
         }
 
         async function cargarDisponibilidadDia() {
