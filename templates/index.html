@@ -302,6 +302,11 @@
                 if (res.ok) {
                     alerta.textContent = editId ? "¡Cita actualizada con éxito!" : "¡Cita agendada con éxito!";
                     alerta.className = "mt-4 p-3 rounded-lg text-xs text-center bg-emerald-50 text-emerald-800 border border-emerald-200 block";
+                    
+                    // Restablecer automáticamente el filtro de visualización al día actual
+                    const fechaHoyStr = new Date().toISOString().slice(0, 10);
+                    document.getElementById("filtro-fecha-citas").value = fechaHoyStr;
+                    
                     cancelarEdicionCita();
                     cargarDisponibilidadDia();
                 } else {
@@ -428,7 +433,6 @@
                 `;
             });
 
-            // Actualizar tarjetas de resumen
             document.getElementById("total-efectivo").textContent = `$${totalEfectivo.toFixed(2)}`;
             document.getElementById("total-tarjeta").textContent = `$${totalTarjeta.toFixed(2)}`;
             document.getElementById("total-neto-general").textContent = `$${totalNetoGeneral.toFixed(2)}`;
@@ -578,8 +582,8 @@
             document.getElementById("btn-submit-cita").textContent = "Confirmar Cita";
             document.getElementById("btn-cancelar-edicion-cita").classList.add("hidden");
             
-            const now = new Date();
-            document.getElementById("cita_fecha").value = now.toISOString().slice(0, 10);
+            const hoyStr = new Date().toISOString().slice(0, 10);
+            document.getElementById("cita_fecha").value = hoyStr;
             actualizarHorariosDisponibles();
         }
 
@@ -593,5 +597,6 @@
             }
         }
     </script>
+
 </body>
 </html>
