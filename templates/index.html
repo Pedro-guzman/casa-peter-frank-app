@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Casa Peter Frank - Panel de Control</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-stone-50 text-stone-800 font-sans antialiased min-h-screen flex flex-col justify-between">
+
+    <header class="bg-white border-b border-stone-200 py-4 px-6 shadow-sm">
+        <div class="max-w-5xl mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-semibold tracking-wide text-stone-900">💈 Casa Peter Frank</h1>
+            <div class="flex items-center gap-3">
+                <a href="/exportar-csv/" class="bg-emerald-700 text-white text-xs font-medium px-3 py-2 rounded-lg hover:bg-emerald-800 transition tracking-wide flex items-center gap-1">
+                    📊 Exportar Excel/CSV
+                </a>
+                <span class="text-xs font-medium uppercase tracking-wider bg-stone-100 px-3 py-1 rounded-full text-stone-600">Local Mode</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto w-full p-6 my-8 grid grid-cols-1 md:grid-cols-3 gap-8">
+        
+        <!-- Columna Izquierda: Formulario de Registro -->
+        <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-1 h-fit">
+            <h2 class="text-base font-medium text-stone-900 mb-4">Registrar Servicio</h2>
+            
+            <form id="form-servicio" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Fecha y Hora</label>
+                    <input type="datetime-local" id="fecha_hora" required class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm bg-white">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Nombre del Cliente</label>
+                    <input type="text" id="cliente_nombre" required placeholder="Ej. Carlos Mendoza" class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Barbero</label>
+                    <select id="barbero_id" required class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm bg-white">
+                        <option value="">Cargando...</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Servicio</label>
+                    <select id="servicio_id" required class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm bg-white">
+                        <option value="">Cargando...</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Método de Pago</label>
+                    <select id="metodo_pago" required class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm bg-white">
+                        <option value="Efectivo">Efectivo</option>
+                        <option value="Tarjeta">Tarjeta (Comisión 4%)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Precio Cobrado ($)</label>
+                    <input type="number" step="0.5" id="precio_cobrado" required placeholder="Ej. 200" class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm">
+                </div>
+
+                <button type="submit" class="w-full py-2.5 bg-stone-900 text-white font-medium rounded-lg hover:bg-stone-800 transition text-sm tracking-wide">
+                    Registrar Servicio
+                </button>
+            </form>
+
+            <div id="mensaje-alerta" class="mt-4 hidden p-3 rounded-lg text-xs text-center"></div>
+        </section>
+
+        <!-- Columna Derecha: Historial y Panel de Visualización -->
+        <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-2">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-base font-medium text-stone-900">Historial de Servicios</h2>
+                <div class="flex gap-2">
+                    <select id="filtro-mes" class="px-2 py-1 text-xs border border-stone-300 rounded-lg bg-white">
+                        <option value="">Todos los meses</option>
+                        <option value="1">Enero</option>
+                        <option value="2">Febrero</option>
+                        <option value="3">Marzo</option>
+                        <option value="4">Abril</option>
+                        <option value="5">Mayo</option>
+                        <option value="6">Junio</option>
+                        <option value="7">Julio</option>
+                        <option value="8">Agosto</option>
+                        <option value="9">Septiembre</option>
+                        <option value="10">Octubre</option>
+                        <option value="11">Noviembre</option>
+                        <option value="12">Diciembre</option>
+                    </select>
+                    <button onclick="cargarHistorial()" class="px-3 py-1 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-medium rounded-lg transition">Filtrar</button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="border-b border-stone-200 text-stone-500 uppercase tracking-wider">
+                            <th class="py-2 px-2">Fecha</th>
+                            <th class="py-2 px-2">Cliente</th>
+                            <th class="py-2 px-2">Barbero</th>
+                            <th class="py-2 px-2">Servicio</th>
+                            <th class="py-2 px-2">Pago</th>
+                            <th class="py-2 px-2 text-right">Cobrado</th>
+                            <th class="py-2 px-2 text-right">Neto</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-historial" class="divide-y divide-stone-100 text-stone-700">
+                        <tr>
+                            <td colspan="7" class="py-4 text-center text-stone-400">Cargando registros...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="text-center py-4 text-xs text-stone-400">
+        Casa Peter Frank &copy; 2026 - Sistema de Gestión Interna
+    </footer>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", async () => {
+            // Fecha y hora actual por defecto
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById("fecha_hora").value = now.toISOString().slice(0, 16);
+
+            await cargarSelects();
+            await cargarHistorial();
+
+            const form = document.getElementById("form-servicio");
+            form.addEventListener("submit", async (e) => {
+                e.preventDefault();
+                const fechaInput = document.getElementById("fecha_hora").value;
+
+                const data = {
+                    cliente_nombre: document.getElementById("cliente_nombre").value,
+                    servicio_id: parseInt(document.getElementById("servicio_id").value),
+                    barbero_id: parseInt(document.getElementById("barbero_id").value),
+                    metodo_pago: document.getElementById("metodo_pago").value,
+                    precio_cobrado: parseFloat(document.getElementById("precio_cobrado").value)
+                };
+
+                if (fechaInput) data.fecha_hora = new Date(fechaInput).toISOString();
+
+                try {
+                    const response = await fetch("/servicios-diarios/", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(data)
+                    });
+                    const result = await response.json();
+                    const alerta = document.getElementById("mensaje-alerta");
+
+                    if (response.ok) {
+                        alerta.textContent = `¡Registrado! Neto guardado: $${result.total_cobrado_neto}`;
+                        alerta.className = "mt-4 p-3 rounded-lg text-xs text-center bg-emerald-50 text-emerald-800 border border-emerald-200 block";
+                        form.reset();
+                        
+                        // Restablecer fecha actual
+                        const resetNow = new Date();
+                        resetNow.setMinutes(resetNow.getMinutes() - resetNow.getTimezoneOffset());
+                        document.getElementById("fecha_hora").value = resetNow.toISOString().slice(0, 16);
+                        
+                        // Recargar tabla de historial
+                        await cargarHistorial();
+                    } else {
+                        alerta.textContent = "Error al registrar servicio";
+                        alerta.className = "mt-4 p-3 rounded-lg text-xs text-center bg-rose-50 text-rose-800 border border-rose-200 border block";
+                    }
+                } catch (err) {
+                    console.error(err);
+                }
+            });
+        });
+
+        async function cargarSelects() {
+            const barberoSelect = document.getElementById("barbero_id");
+            const servicioSelect = document.getElementById("servicio_id");
+
+            try {
+                const resB = await fetch("/barberos/");
+                const barberos = await resB.json();
+                barberoSelect.innerHTML = '<option value="">Selecciona barbero</option>';
+                barberos.forEach(b => barberoSelect.innerHTML += `<option value="${b.id}">${b.nombre}</option>`);
+
+                const resS = await fetch("/servicios-catalogo/");
+                const catalogo = await resS.json();
+                servicioSelect.innerHTML = '<option value="">Selecciona servicio</option>';
+                catalogo.forEach(s => servicioSelect.innerHTML += `<option value="${s.id}">${s.nombre_servicio}</option>`);
+            } catch (err) {
+                console.error("Error cargando catálogos", err);
+            }
+        }
+
+        async function cargarHistorial() {
+            const mes = document.getElementById("filtro-mes").value;
+            let url = "/servicios-diarios/";
+            if (mes) url += `?mes=${mes}`;
+
+            try {
+                const res = await fetch(url);
+                const registros = await res.json();
+                const tbody = document.getElementById("tabla-historial");
+                
+                if (registros.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="7" class="py-4 text-center text-stone-400">No hay registros encontrados.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = "";
+                registros.forEach(r => {
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-stone-50 transition">
+                            <td class="py-2.5 px-2">${r.fecha_hora}</td>
+                            <td class="py-2.5 px-2 font-medium">${r.cliente_nombre}</td>
+                            <td class="py-2.5 px-2">${r.barbero}</td>
+                            <td class="py-2.5 px-2">${r.servicio}</td>
+                            <td class="py-2.5 px-2"><span class="px-2 py-0.5 rounded text-[10px] ${r.metodo_pago === 'Tarjeta' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-stone-100 text-stone-700'}">${r.metodo_pago}</span></td>
+                            <td class="py-2.5 px-2 text-right">$${r.precio_cobrado.toFixed(2)}</td>
+                            <td class="py-2.5 px-2 text-right font-semibold text-emerald-700">$${r.total_cobrado_neto.toFixed(2)}</td>
+                        </tr>
+                    `;
+                });
+            } catch (err) {
+                console.error("Error al cargar historial", err);
+            }
+        }
+    </script>
+</body>
+</html>
