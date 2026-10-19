@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
 from sqlalchemy.orm import Session
 from datetime import datetime
-from database import get_db, engine, Base
+from database import get_db, SessionLocal, engine, Base
 from models import BarberoModel, ServicioCatalogoModel, ServicioDiarioModel
 from pydantic import BaseModel
 from typing import Optional
@@ -17,16 +17,25 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Casa Peter Frank")
 templates = Jinja2Templates(directory="templates")
 
-# Evento de inicio para poblar datos semilla automáticamente si está vacío
+# Definición del esquema Pydantic para la validación de entrada
+class ServicioDiarioCreate(BaseModel):
+    cliente_nombre: str
+    barbero_id: int
+    servicio_id: int
+    metodo_pago: str
+    precio_cobrado: float
+    fecha_hora: Optional[datetime] = None
+
+# Evento de inicio para poblar datos semilla automáticamente si está vacío en la nube
 @app.on_event("startup")
 def startup_event():
-    db = SessionLocal() if 'SessionLocal' in globals() else next(get_db())
+    db = SessionLocal()
     try:
         # Verificar si hay barberos, si no, crearlos
         if db.query(BarberoModel).count() == 0:
             for b in ["Peter", "Frank"]:
                 db.add(BarberoModel(nombre=b))
-            print("Barberos semilla creados en producción.")
+            print("Barberos semilla creados.")
 
         # Verificar si hay catálogo, si no, crearlo
         if db.query(ServicioCatalogoModel).count() == 0:
@@ -36,7 +45,7 @@ def startup_event():
             ]
             for s in servicios:
                 db.add(ServicioCatalogoModel(nombre_servicio=s))
-            print("Catálogo semilla creado en producción.")
+            print("Catálogo semilla creado.")
             
         db.commit()
     except Exception as e:
@@ -44,7 +53,6 @@ def startup_event():
         print(f"Error en startup: {e}")
     finally:
         db.close()
-
 
 @app.get("/", include_in_schema=False)
 def redirectToApp():
@@ -66,7 +74,7 @@ def listar_catalogo(db: Session = Depends(get_db)):
 def crear_servicio_diario(servicio: ServicioDiarioCreate, db: Session = Depends(get_db)):
     neto = servicio.precio_cobrado
     if servicio.metodo_pago.lower() == "tarjeta":
-        neto = servicio.precio_cobrado * (1 - 0.04)  # Comisión bancaria 3.5%
+        neto = servicio.precio_cobrado * (1 - 0.04)  # Comisión bancaria actualizada al 4%
 
     nuevo_registro = ServicioDiarioModel(
         cliente_nombre=servicio.cliente_nombre,
@@ -94,14 +102,10 @@ def listar_servicios_diarios(
     anio: Optional[int] = Query(None, description="Filtrar por año (ej. 2026)")
 ):
     query = db.query(ServicioDiarioModel)
-    
-    # Filtros temporales si el usuario los solicita
     resultados = query.all()
     
-    # Mapeo amigable para el frontend con nombres de barbero y servicio
     datos_formateados = []
     for reg in resultados:
-        # Filtrado opcional en memoria o SQL avanzado (aquí aplicado limpio)
         if mes and reg.fecha_hora.month != mes:
             continue
         if anio and reg.fecha_hora.year != anio:
@@ -125,11 +129,9 @@ def listar_servicios_diarios(
 
 @app.get("/exportar-csv/")
 def exportar_csv(db: Session = Depends(get_db)):
-    # Crear un archivo CSV en memoria
     output = io.StringIO()
     writer = csv.writer(output)
     
-    # Encabezados de columnas
     writer.writerow(["ID", "Fecha y Hora", "Cliente", "Barbero", "Servicio", "Método de Pago", "Precio Cobrado", "Total Neto"])
     
     registros = db.query(ServicioDiarioModel).all()
