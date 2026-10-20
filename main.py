@@ -293,18 +293,46 @@ def cancelar_cita(id: int, db: Session = Depends(get_db)):
 
 @app.get("/exportar-csv/")
 def exportar_csv(db: Session = Depends(get_db)):
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["ID", "Fecha y Hora", "Cliente", "Barbero", "Servicio", "Método de Pago", "Precio Cobrado", "Total Neto"])
-    
-    registros = db.query(ServicioDiarioModel).all()
-    for reg in registros:
-        barbero = db.query(BarberoModel).filter_by(id=reg.barbero_id).first()
-        servicio = db.query(ServicioCatalogoModel).filter_by(id=reg.servicio_id).first()
-        writer.writerow([
-            reg.id, reg.fecha_hora.strftime("%Y-%m-%d %H:%M"), reg.cliente_nombre,
-            barbero.nombre if barbero else "", servicio.nombre_servicio if servicio else "",
-            reg.metodo_pago, reg.precio_cobrado, reg.total_cobrado_neto
-        ])
-    output.seek(0)
-    return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=reporte_casa_peter_frank.csv"})
+    try:
+        # Crear un archivo CSV en memoria
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Encabezados de columnas
+        writer.writerow(["ID", "Fecha y Hora", "Cliente", "Barbero", "Servicio", "Método de Pago", "Precio Cobrado", "Total Neto"])
+        
+        registros = db.query(ServicioDiarioModel).all()
+        for reg in registros:
+            # Obtener barbero y servicio de forma segura
+            barbero = db.query(BarberoModel).filter_by(id=reg.barbero_id).first() if reg.barbero_id else None
+            servicio = db.query(ServicioCatalogoModel).filter_by(id=reg.servicio_id).first() if reg.servicio_id else None
+            
+            # Formatear fecha de manera segura por si llegara a ser nula
+            fecha_str = ""
+            if reg.fecha_hora:
+                try:
+                    fecha_str = reg.fecha_hora.strftime("%Y-%m-%d %H:%M")
+                except Exception:
+                    fecha_str = str(reg.fecha_hora)
+            
+            writer.writerow([
+                reg.id,
+                fecha_str,
+                reg.cliente_nombre or "Sin nombre",
+                barbero.nombre if barbero else "Desconocido",
+                servicio.nombre_servicio if servicio else "Desconocido",
+                reg.metodo_pago or "Efectivo",
+                reg.precio_cobrado or 0.0,
+                reg.total_cobrado_neto or 0.0
+            ])
+            
+        output.seek(0)
+        
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=reporte_casa_peter_frank.csv"}
+        )
+    except Exception as e:
+        print(f"Error al exportar CSV: {e}")
+        return {"error": f"No se pudo generar el reporte: {str(e)}"}, 500
