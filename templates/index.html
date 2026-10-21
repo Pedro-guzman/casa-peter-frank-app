@@ -18,8 +18,8 @@
             </div>
             <div class="flex items-center gap-3">
                <nav class="flex gap-2 bg-stone-100 p-1 rounded-lg">
-                    <button onclick="cambiarVista('servicios')" id="btn-servicios" class="px-3 py-1.5 text-xs font-medium rounded-md text-stone-600 hover:text-stone-900 transition">Servicios Diarios</button>
-                    <button onclick="cambiarVista('citas')" id="btn-citas" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white text-stone-900 shadow-sm transition">Agenda de Citas</button>
+                <button onclick="cambiarVista('citas')" id="btn-citas" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white text-stone-900 shadow-sm transition">Agenda de Citas</button>
+                    <button onclick="cambiarVista('servicios')" id="btn-servicios" class="px-3 py-1.5 text-xs font-medium rounded-md text-stone-600 hover:text-stone-900 transition">Servicios Diarios</button> 
                 </nav>
 
                 <a href="/exportar-csv/" class="bg-emerald-700 text-white text-xs font-medium px-3 py-2 rounded-lg hover:bg-emerald-800 transition tracking-wide">
@@ -226,12 +226,17 @@
                 <div id="cita-alerta" class="mt-4 hidden p-3 rounded-lg text-xs text-center"></div>
             </section>
 
-            <!-- Visualización de Disponibilidad por Día -->
+                       <!-- Visualización de Disponibilidad por Día -->
+                        <!-- Visualización de Disponibilidad por Día -->
             <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-2">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-base font-medium text-stone-900">Disponibilidad de Citas</h2>
+                <!-- Encabezado Sticky de Disponibilidad para que nunca se pierda al hacer scroll -->
+                <div class="sticky top-20 bg-white/95 backdrop-blur z-20 pb-4 mb-4 border-b border-stone-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                        <input type="date" id="filtro-fecha-citas" class="px-3 py-1.5 text-xs border border-stone-300 rounded-lg bg-white" onchange="cargarDisponibilidadDia()">
+                        <h2 class="text-base font-medium text-stone-900">Disponibilidad de Citas</h2>
+                        <p id="label-fecha-activa" class="text-xs font-semibold text-emerald-700 mt-0.5">Cargando fecha...</p>
+                    </div>
+                    <div>
+                        <input type="date" id="filtro-fecha-citas" class="px-3 py-1.5 text-xs border border-stone-300 rounded-lg bg-white font-medium" onchange="cargarDisponibilidadDia()">
                     </div>
                 </div>
 
@@ -239,6 +244,7 @@
                     <p class="text-xs text-stone-400 text-center py-6">Selecciona una fecha para ver los horarios y espacios disponibles.</p>
                 </div>
             </section>
+
         </div>
 
     </main>
@@ -513,13 +519,27 @@
             document.getElementById("fecha_hora").value = now.toISOString().slice(0, 16);
         }
 
-        async function cargarDisponibilidadDia() {
-            const fecha = document.getElementById("filtro-fecha-citas").value;
+                     async function cargarDisponibilidadDia() {
+            const inputFecha = document.getElementById("filtro-fecha-citas");
+            const fecha = inputFecha.value;
+            const contenedor = document.getElementById("contenedor-disponibilidad");
+            const labelActiva = document.getElementById("label-fecha-activa");
+
             if (!fecha) return;
+
+            contenedor.innerHTML = `<p class="text-xs text-stone-400 text-center py-6">Actualizando disponibilidad...</p>`;
+            
+            // Formatear fecha para el título principal
+            const [anio, mes, dia] = fecha.split("-");
+            const fechaObj = new Date(anio, mes - 1, dia);
+            const opcionesFecha = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            labelActiva.textContent = `📅 Mostrando agenda para: ${fechaObj.toLocaleDateString('es-ES', opcionesFecha)}`;
+
+            // Formato corto para mostrar al costado de cada bloque (Ej. "24/10/2026")
+            const fechaFormateadaCorta = `${dia}/${mes}/${anio}`;
 
             const res = await fetch(`/citas-disponibilidad/?fecha=${fecha}`);
             const data = await res.json();
-            const contenedor = document.getElementById("contenedor-disponibilidad");
 
             if (data.mensaje) {
                 contenedor.innerHTML = `<p class="text-xs text-rose-600 text-center py-6 font-medium">${data.mensaje}</p>`;
@@ -556,10 +576,12 @@
                     }
                 });
 
+                // Se añade la fecha exacta a un costado del horario para confirmación visual permanente
                 contenedor.innerHTML += `
                     <div class="border border-stone-200 rounded-xl p-3 bg-stone-50/50">
-                        <div class="font-semibold text-xs text-stone-900 mb-2 flex items-center gap-2">
-                            ⏰ ${hora12}
+                        <div class="font-semibold text-xs text-stone-900 mb-2 flex justify-between items-center">
+                            <span class="flex items-center gap-1.5">⏰ ${hora12}</span>
+                            <span class="bg-stone-200/80 text-stone-700 px-2 py-0.5 rounded text-[10px] font-mono tracking-wider">📅 Fecha: ${fechaFormateadaCorta}</span>
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             ${htmlEspacios}
@@ -570,6 +592,8 @@
 
             actualizarHorariosDisponiblesDesdeBloques(data.bloques);
         }
+
+
 
         function actualizarHorariosDisponiblesDesdeBloques(bloques) {
             const selectHora = document.getElementById("cita_hora");
