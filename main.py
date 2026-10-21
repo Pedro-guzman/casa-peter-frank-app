@@ -184,13 +184,6 @@ def obtener_horarios_dia(fecha_str: str):
 
 @app.get("/citas-disponibilidad/")
 def consultar_disponibilidad(fecha: str, db: Session = Depends(get_db)):
-    # Limpieza automática de citas pasadas
-    hoy_str = date.today().strftime("%Y-%m-%d")
-    try:
-        db.query(CitaModel).filter(CitaModel.fecha < hoy_str).delete(synchronize_session=False)
-        db.commit()
-    except Exception as e:
-        db.rollback()
 
     horarios = obtener_horarios_dia(fecha)
     if not horarios:
