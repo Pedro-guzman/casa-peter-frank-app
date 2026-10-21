@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, status, Query
+from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
@@ -14,6 +15,7 @@ import csv
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Casa Peter Frank")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 class ServicioDiarioCreate(BaseModel):
@@ -362,7 +364,6 @@ def cancelar_cita(id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"mensaje": "Cita cancelada con éxito"}
 
-@app.exportar_csv_endpoint_si_necesario = ... # (Mantiene el exportar CSV que ya tenías)
 @app.get("/exportar-csv/")
 def exportar_csv(db: Session = Depends(get_db)):
     try:

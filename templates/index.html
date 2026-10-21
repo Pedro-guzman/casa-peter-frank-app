@@ -12,15 +12,16 @@
     <header class="bg-white border-b border-stone-200 py-4 px-6 shadow-sm sticky top-0 z-50">
         <div class="max-w-6xl mx-auto flex justify-between items-center">
             <div class="flex items-center gap-3">
-                <!-- Logo 100% Redondo (Asegúrate de tener static/logo.png o ajusta la ruta) -->
-                <img src="/static/logo.jpeg" alt="Logo" onerror="this.src='https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=100&h=100&fit=crop'" class="w-10 h-10 rounded-full object-cover border border-stone-300 shadow-sm">
+                <!-- Logo 100% Redondo -->
+                <img src="../static/logo.jpeg" alt="Logo" onerror="this.src='/static/logo.png'" class="w-10 h-10 rounded-full object-cover border border-stone-300 shadow-sm">
                 <h1 class="text-xl font-semibold tracking-wide text-stone-900">Casa Peter Frank</h1>
             </div>
             <div class="flex items-center gap-3">
-                <nav class="flex gap-2 bg-stone-100 p-1 rounded-lg">
-                    <button onclick="cambiarVista('servicios')" id="btn-servicios" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white text-stone-900 shadow-sm transition">Servicios Diarios</button>
-                    <button onclick="cambiarVista('citas')" id="btn-citas" class="px-3 py-1.5 text-xs font-medium rounded-md text-stone-600 hover:text-stone-900 transition">Agenda de Citas</button>
+               <nav class="flex gap-2 bg-stone-100 p-1 rounded-lg">
+                    <button onclick="cambiarVista('servicios')" id="btn-servicios" class="px-3 py-1.5 text-xs font-medium rounded-md text-stone-600 hover:text-stone-900 transition">Servicios Diarios</button>
+                    <button onclick="cambiarVista('citas')" id="btn-citas" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white text-stone-900 shadow-sm transition">Agenda de Citas</button>
                 </nav>
+
                 <a href="/exportar-csv/" class="bg-emerald-700 text-white text-xs font-medium px-3 py-2 rounded-lg hover:bg-emerald-800 transition tracking-wide">
                     📊 Exportar CSV
                 </a>
@@ -30,10 +31,10 @@
 
     <main class="max-w-6xl mx-auto w-full p-6 my-6">
         
-        <!-- VISTA 1: SERVICIOS DIARIOS Y REGISTRO -->
-        <div id="vista-servicios" class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <!-- Formulario de Registro / Edición Fijo -->
-            <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-1 h-fit sticky top-24">
+        <!-- VISTA 1: SERVICIOS DIARIOS Y REGISTRO (INICIA OCULTA) -->
+        <div id="vista-servicios" class="hidden grid grid-cols-1 md:grid-cols-3 gap-8">
+            <!-- Formulario de Registro / Edición (Sticky solo en PC) -->
+            <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-1 h-fit md:sticky md:top-24">
                 <h2 id="titulo-form-servicio" class="text-base font-medium text-stone-900 mb-4">Registrar Servicio</h2>
                 
                 <form id="form-servicio" class="space-y-4">
@@ -89,7 +90,6 @@
 
             <!-- Historial y Totales -->
             <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-2 space-y-6">
-                
                 <!-- Panel de Totales Resumen -->
                 <div class="grid grid-cols-3 gap-4">
                     <div class="bg-stone-50 border border-stone-200 p-3 rounded-xl">
@@ -117,18 +117,14 @@
                             <option value="mes">Por Mes</option>
                             <option value="anio">Por Año</option>
                         </select>
-
                         <input type="date" id="filtro-input-fecha" class="hidden px-2 py-1 text-xs border border-stone-300 rounded-lg bg-white">
-                        
                         <select id="filtro-mes" class="hidden px-2 py-1 text-xs border border-stone-300 rounded-lg bg-white">
                             <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
                             <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
                             <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
                             <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
                         </select>
-
                         <input type="number" id="filtro-anio" placeholder="Ej. 2026" class="hidden w-20 px-2 py-1 text-xs border border-stone-300 rounded-lg bg-white">
-
                         <button onclick="cargarHistorial()" class="px-3 py-1 bg-stone-900 hover:bg-stone-800 text-white text-xs font-medium rounded-lg transition">Aplicar</button>
                     </div>
                 </div>
@@ -154,10 +150,10 @@
             </section>
         </div>
 
-        <!-- VISTA 2: AGENDA DE CITAS -->
-        <div id="vista-citas" class="hidden grid grid-cols-1 md:grid-cols-3 gap-8">
-            <!-- Formulario Agendar / Editar Cita (Fijo) -->
-            <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-1 h-fit sticky top-24">
+        <!-- VISTA 2: AGENDA DE CITAS (INICIA VISIBLE POR DEFECTO) -->
+        <div id="vista-citas" class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <!-- Formulario Agendar / Editar Cita (Sticky solo en PC) -->
+            <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-1 h-fit md:sticky md:top-24">
                 <h2 id="titulo-form-cita" class="text-base font-medium text-stone-900 mb-4">Agendar Nueva Cita</h2>
                 
                 <form id="form-cita" class="space-y-4">
@@ -347,7 +343,7 @@
                     
                     cancelarEdicionCita();
                     cargarDisponibilidadDia();
-                    cargarHistorial(); // Refrescar ingresos diarios también
+                    cargarHistorial(); 
                 } else {
                     alerta.textContent = result.error || "Error al procesar cita";
                     alerta.className = "mt-4 p-3 rounded-lg text-xs text-center bg-rose-50 text-rose-800 border border-rose-200 block";
