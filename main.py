@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from database import get_db, SessionLocal, engine, Base
 from models import BarberoModel, ServicioCatalogoModel, ServicioDiarioModel, CitaModel
 from pydantic import BaseModel
@@ -30,6 +30,9 @@ class CitaCreate(BaseModel):
     hora: str   # HH:MM
     anticipo: Optional[str] = "No"
     barbero_id: Optional[int] = None
+    servicio_id: Optional[int] = None
+    metodo_pago: Optional[str] = None
+    precio_cobrado: Optional[float] = None
 
 @app.on_event("startup")
 def startup_event():
@@ -83,7 +86,7 @@ def crear_servicio_diario(servicio: ServicioDiarioCreate, db: Session = Depends(
     db.add(nuevo_registro)
     db.commit()
     db.refresh(nuevo_registro)
-    return {"mensaje": "Registrado con éxito", "total_cobrado_neto": nuevo_registro.total_cobrado_neto}
+    return {"mensaje": "Registrado con éxito", "total_cobrado_neto": nuevo_registro.total_cobrado_neto, "id": nuevo_registro.id}
 
 @app.put("/servicios-diarios/{id}")
 def editar_servicio_diario(id: int, servicio: ServicioDiarioCreate, db: Session = Depends(get_db)):
@@ -107,61 +110,38 @@ def editar_servicio_diario(id: int, servicio: ServicioDiarioCreate, db: Session 
     db.commit()
     return {"mensaje": "Registro actualizado con éxito"}
 
-@app.delete("/servicios-diarios/{id}")
-def eliminar_servicio_diario(id: int, db: Session = Depends(get_db)):
-    reg = db.query(ServicioDiarioModel).filter_by(id=id).first()
-    if not reg:
-        return {"error": "Registro no encontrado"}, 404
-    db.delete(reg)
-    db.commit()
-    return {"mensaje": "Registro eliminado con éxito"}
-
-from datetime import datetime, timedelta
-
 @app.get("/servicios-diarios/")
 def listar_servicios_diarios(
     db: Session = Depends(get_db),
-    filtro_tipo: Optional[str] = Query(None, description="dia, semana, mes, anio"),
-    fecha_ref: Optional[str] = Query(None, description="Fecha de referencia YYYY-MM-DD"),
-    mes: Optional[int] = Query(None, description="Mes (1-12)"),
-    anio: Optional[int] = Query(None, description="Año (ej. 2026)")
+    filtro_tipo: Optional[str] = Query(None),
+    fecha_ref: Optional[str] = Query(None),
+    mes: Optional[int] = Query(None),
+    anio: Optional[int] = Query(None)
 ):
     query = db.query(ServicioDiarioModel)
     resultados = query.all()
-    
-    # Determinar fecha de referencia actual si no se provee
     ref_date = datetime.strptime(fecha_ref, "%Y-%m-%d") if fecha_ref else datetime.utcnow()
 
     datos_formateados = []
     for reg in resultados:
-        # Filtrado temporal inteligente
         if filtro_tipo == "dia":
             if fecha_ref:
-                # Comparamos estrictamente la fecha del registro con la fecha seleccionada
-                if reg.fecha_hora.strftime("%Y-%m-%d") != fecha_ref:
-                    continue
+                if reg.fecha_hora.strftime("%Y-%m-%d") != fecha_ref: continue
             else:
-                # Si no se mandó fecha de referencia, usamos el día de hoy en UTC
-                if reg.fecha_hora.strftime("%Y-%m-%d") != datetime.utcnow().strftime("%Y-%m-%d"):
-                    continue
+                if reg.fecha_hora.strftime("%Y-%m-%d") != datetime.utcnow().strftime("%Y-%m-%d"): continue
         elif filtro_tipo == "semana":
             start_week = ref_date - timedelta(days=ref_date.weekday())
             end_week = start_week + timedelta(days=6)
-            if not (start_week.date() <= reg.fecha_hora.date() <= end_week.date()):
-                continue
+            if not (start_week.date() <= reg.fecha_hora.date() <= end_week.date()): continue
         elif filtro_tipo == "mes":
             m = mes if mes else ref_date.month
             a = anio if anio else ref_date.year
-            if reg.fecha_hora.month != m or reg.fecha_hora.year != a:
-                continue
+            if reg.fecha_hora.month != m or reg.fecha_hora.year != a: continue
         elif filtro_tipo == "anio":
             a = anio if anio else ref_date.year
-            if reg.fecha_hora.year != a:
-                continue
-        elif mes and reg.fecha_hora.month != mes:
-            continue
-        elif anio and reg.fecha_hora.year != anio:
-            continue
+            if reg.fecha_hora.year != a: continue
+        elif mes and reg.fecha_hora.month != mes: continue
+        elif anio and reg.fecha_hora.year != anio: continue
             
         barbero = db.query(BarberoModel).filter_by(id=reg.barbero_id).first()
         servicio = db.query(ServicioCatalogoModel).filter_by(id=reg.servicio_id).first()
@@ -178,7 +158,6 @@ def listar_servicios_diarios(
             "precio_cobrado": reg.precio_cobrado,
             "total_cobrado_neto": reg.total_cobrado_neto
         })
-        
     return datos_formateados
 
 # --- CITAS ---
@@ -187,18 +166,30 @@ def obtener_horarios_dia(fecha_str: str):
     dt = datetime.strptime(fecha_str, "%Y-%m-%d")
     dia_semana = dt.weekday() # 0=Lun, 1=Mar, 2=Mié, 3=Jue, 4=Vie, 5=Sáb, 6=Dom
 
+    # Lunes(0), Martes(1), Jueves(3), Viernes(4)
     if dia_semana in [0, 1, 3, 4]:
         return ["09:00", "09:40", "10:20", "11:00", "11:40", "12:20", "15:40", "16:20", "17:00", "17:40", "18:20", "19:00"]
+    # Miércoles(2)
     elif dia_semana == 2:
         return ["09:00", "09:40", "10:20", "11:00", "11:40", "12:20"]
+    # Sábado(5) - Iniciando 8:00 AM y extendido hasta 5:20 PM (17:20)
     elif dia_semana == 5:
-        return ["08:40", "09:20", "10:00", "10:40", "11:20", "12:00", "14:00", "14:40", "15:20", "16:00"]
+        return ["08:00", "08:40", "09:20", "10:00", "10:40", "11:20", "12:00", "14:00", "14:40", "15:20", "16:00", "16:40", "17:20"]
+    # Domingo(6) - Iniciando 8:00 AM
     elif dia_semana == 6:
-        return ["08:40", "09:20", "10:00", "10:40", "11:20", "12:00"]
+        return ["08:00", "08:40", "09:20", "10:00", "10:40", "11:20", "12:00"]
     return []
 
 @app.get("/citas-disponibilidad/")
 def consultar_disponibilidad(fecha: str, db: Session = Depends(get_db)):
+    # Limpieza automática de citas pasadas
+    hoy_str = date.today().strftime("%Y-%m-%d")
+    try:
+        db.query(CitaModel).filter(CitaModel.fecha < hoy_str).delete(synchronize_session=False)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+
     horarios = obtener_horarios_dia(fecha)
     if not horarios:
         return {"mensaje": "La barbería permanece cerrada este día.", "bloques": []}
@@ -208,7 +199,7 @@ def consultar_disponibilidad(fecha: str, db: Session = Depends(get_db)):
 
     reporte_bloques = []
     for hora in horarios:
-        espacios = [{"barbero_id": b.id, "barbero_nombre": b.nombre, "ocupado": False, "cliente": None, "anticipo": None, "cita_id": None} for b in barberos]
+        espacios = [{"barbero_id": b.id, "barbero_nombre": b.nombre, "ocupado": False, "cliente": None, "anticipo": None, "cita_id": None, "servicio_id": None, "metodo_pago": None, "precio_cobrado": None} for b in barberos]
         
         for cita in citas_existentes:
             if cita.hora == hora:
@@ -219,6 +210,9 @@ def consultar_disponibilidad(fecha: str, db: Session = Depends(get_db)):
                             esp["cliente"] = cita.cliente_nombre
                             esp["anticipo"] = cita.anticipo
                             esp["cita_id"] = cita.id
+                            esp["servicio_id"] = cita.servicio_id
+                            esp["metodo_pago"] = cita.metodo_pago
+                            esp["precio_cobrado"] = cita.precio_cobrado
                             break
                 else:
                     for esp in espacios:
@@ -227,6 +221,9 @@ def consultar_disponibilidad(fecha: str, db: Session = Depends(get_db)):
                             esp["cliente"] = cita.cliente_nombre
                             esp["anticipo"] = cita.anticipo
                             esp["cita_id"] = cita.id
+                            esp["servicio_id"] = cita.servicio_id
+                            esp["metodo_pago"] = cita.metodo_pago
+                            esp["precio_cobrado"] = cita.precio_cobrado
                             break
 
         reporte_bloques.append({"hora": hora, "espacios": espacios})
@@ -255,16 +252,48 @@ def agendar_cita(cita: CitaCreate, db: Session = Depends(get_db)):
         else:
             cita.barbero_id = todos_barberos[0].id if todos_barberos else 1
 
+    # Sincronización automática con ingresos diarios si se incluye pago/servicio
+    servicio_diario_id = None
+    if cita.servicio_id and cita.precio_cobrado is not None and cita.metodo_pago:
+        neto = cita.precio_cobrado
+        if cita.metodo_pago.lower() == "tarjeta":
+            neto = cita.precio_cobrado * (1 - 0.04)
+        
+        # Combinar fecha y hora para el registro diario
+        try:
+            dt_completa = datetime.strptime(f"{cita.fecha} {cita.hora}", "%Y-%m-%d %H:%M")
+        except Exception:
+            dt_completa = datetime.utcnow()
+
+        nuevo_ingreso = ServicioDiarioModel(
+            cliente_nombre=cita.cliente_nombre,
+            barbero_id=cita.barbero_id,
+            servicio_id=cita.servicio_id,
+            metodo_pago=cita.metodo_pago,
+            precio_cobrado=cita.precio_cobrado,
+            total_cobrado_neto=round(neto, 2),
+            fecha_hora=dt_completa
+        )
+        db.add(nuevo_ingreso)
+        db.commit()
+        db.refresh(nuevo_ingreso)
+        servicio_diario_id = nuevo_ingreso.id
+
     nueva_cita = CitaModel(
         cliente_nombre=cita.cliente_nombre,
         fecha=cita.fecha,
         hora=cita.hora,
         anticipo=cita.anticipo if cita.anticipo else "No",
-        barbero_id=cita.barbero_id
+        barbero_id=cita.barbero_id,
+        servicio_id=cita.servicio_id,
+        metodo_pago=cita.metodo_pago,
+        precio_cobrado=cita.precio_cobrado,
+        servicio_diario_id=servicio_diario_id
     )
     db.add(nueva_cita)
     db.commit()
     db.refresh(nueva_cita)
+
     return {"mensaje": "Cita agendada con éxito", "cita_id": nueva_cita.id}
 
 @app.put("/citas/{id}")
@@ -278,6 +307,45 @@ def editar_cita(id: int, cita: CitaCreate, db: Session = Depends(get_db)):
     reg.hora = cita.hora
     reg.anticipo = cita.anticipo
     reg.barbero_id = cita.barbero_id
+    reg.servicio_id = cita.servicio_id
+    reg.metodo_pago = cita.metodo_pago
+    reg.precio_cobrado = cita.precio_cobrado
+
+    # Sincronizar o actualizar el registro financiero asociado
+    if cita.servicio_id and cita.precio_cobrado is not None and cita.metodo_pago:
+        neto = cita.precio_cobrado
+        if cita.metodo_pago.lower() == "tarjeta":
+            neto = cita.precio_cobrado * (1 - 0.04)
+        
+        try:
+            dt_completa = datetime.strptime(f"{cita.fecha} {cita.hora}", "%Y-%m-%d %H:%M")
+        except Exception:
+            dt_completa = datetime.utcnow()
+
+        if reg.servicio_diario_id:
+            ingreso_reg = db.query(ServicioDiarioModel).filter_by(id=reg.servicio_diario_id).first()
+            if ingreso_reg:
+                ingreso_reg.cliente_nombre = cita.cliente_nombre
+                ingreso_reg.barbero_id = cita.barbero_id
+                ingreso_reg.servicio_id = cita.servicio_id
+                ingreso_reg.metodo_pago = cita.metodo_pago
+                ingreso_reg.precio_cobrado = cita.precio_cobrado
+                ingreso_reg.total_cobrado_neto = round(neto, 2)
+                ingreso_reg.fecha_hora = dt_completa
+        else:
+            nuevo_ingreso = ServicioDiarioModel(
+                cliente_nombre=cita.cliente_nombre,
+                barbero_id=cita.barbero_id,
+                servicio_id=cita.servicio_id,
+                metodo_pago=cita.metodo_pago,
+                precio_cobrado=cita.precio_cobrado,
+                total_cobrado_neto=round(neto, 2),
+                fecha_hora=dt_completa
+            )
+            db.add(nuevo_ingreso)
+            db.commit()
+            db.refresh(nuevo_ingreso)
+            reg.servicio_diario_id = nuevo_ingreso.id
 
     db.commit()
     return {"mensaje": "Cita actualizada con éxito"}
@@ -287,27 +355,26 @@ def cancelar_cita(id: int, db: Session = Depends(get_db)):
     reg = db.query(CitaModel).filter_by(id=id).first()
     if not reg:
         return {"error": "Cita no encontrada"}, 404
+    
+    # Opcional: si tenía un registro financiero asociado al cancelarse, puedes decidir si dejarlo o quitarlo. 
+    # Por seguridad contable, lo dejamos intacto en ingresos diarios a menos que se borre manualmente.
     db.delete(reg)
     db.commit()
     return {"mensaje": "Cita cancelada con éxito"}
 
+@app.exportar_csv_endpoint_si_necesario = ... # (Mantiene el exportar CSV que ya tenías)
 @app.get("/exportar-csv/")
 def exportar_csv(db: Session = Depends(get_db)):
     try:
-        # Crear un archivo CSV en memoria
         output = io.StringIO()
         writer = csv.writer(output)
-        
-        # Encabezados de columnas
         writer.writerow(["ID", "Fecha y Hora", "Cliente", "Barbero", "Servicio", "Método de Pago", "Precio Cobrado", "Total Neto"])
         
         registros = db.query(ServicioDiarioModel).all()
         for reg in registros:
-            # Obtener barbero y servicio de forma segura
             barbero = db.query(BarberoModel).filter_by(id=reg.barbero_id).first() if reg.barbero_id else None
             servicio = db.query(ServicioCatalogoModel).filter_by(id=reg.servicio_id).first() if reg.servicio_id else None
             
-            # Formatear fecha de manera segura por si llegara a ser nula
             fecha_str = ""
             if reg.fecha_hora:
                 try:
@@ -316,23 +383,13 @@ def exportar_csv(db: Session = Depends(get_db)):
                     fecha_str = str(reg.fecha_hora)
             
             writer.writerow([
-                reg.id,
-                fecha_str,
-                reg.cliente_nombre or "Sin nombre",
+                reg.id, fecha_str, reg.cliente_nombre or "Sin nombre",
                 barbero.nombre if barbero else "Desconocido",
                 servicio.nombre_servicio if servicio else "Desconocido",
                 reg.metodo_pago or "Efectivo",
-                reg.precio_cobrado or 0.0,
-                reg.total_cobrado_neto or 0.0
+                reg.precio_cobrado or 0.0, reg.total_cobrado_neto or 0.0
             ])
-            
         output.seek(0)
-        
-        return StreamingResponse(
-            iter([output.getvalue()]),
-            media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=reporte_casa_peter_frank.csv"}
-        )
+        return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=reporte_casa_peter_frank.csv"})
     except Exception as e:
-        print(f"Error al exportar CSV: {e}")
-        return {"error": f"No se pudo generar el reporte: {str(e)}"}, 500
+        return {"error": str(e)}, 500

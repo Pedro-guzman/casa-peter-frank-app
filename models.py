@@ -27,8 +27,13 @@ class CitaModel(Base):
     __tablename__ = "citas"
     id = Column(Integer, primary_key=True, index=True)
     cliente_nombre = Column(String, nullable=False)
-    fecha = Column(String, nullable=False)
-    hora = Column(String, nullable=False)
-    anticipo = Column(String, nullable=True)
+    fecha = Column(String, nullable=False)  # Formato "YYYY-MM-DD"
+    hora = Column(String, nullable=False)   # Formato "08:00"
+    anticipo = Column(String, nullable=True)  
     barbero_id = Column(Integer, ForeignKey("barberos.id"), nullable=True)
     
+    # Nuevos campos opcionales para unificar el pago desde la cita
+    servicio_id = Column(Integer, ForeignKey("servicios_catalogo.id"), nullable=True)
+    metodo_pago = Column(String, nullable=True)
+    precio_cobrado = Column(Float, nullable=True)
+    servicio_diario_id = Column(Integer, ForeignKey("servicios_diarios.id"), nullable=True) # Vinculo opcional con ingresos

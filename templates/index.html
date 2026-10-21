@@ -8,9 +8,14 @@
 </head>
 <body class="bg-stone-50 text-stone-800 font-sans antialiased min-h-screen flex flex-col justify-between">
 
-    <header class="bg-white border-b border-stone-200 py-4 px-6 shadow-sm">
+    <!-- Header Fijo -->
+    <header class="bg-white border-b border-stone-200 py-4 px-6 shadow-sm sticky top-0 z-50">
         <div class="max-w-6xl mx-auto flex justify-between items-center">
-            <h1 class="text-xl font-semibold tracking-wide text-stone-900">💈 Casa Peter Frank</h1>
+            <div class="flex items-center gap-3">
+                <!-- Logo 100% Redondo (Asegúrate de tener static/logo.png o ajusta la ruta) -->
+                <img src="/static/logo.jpeg" alt="Logo" onerror="this.src='https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=100&h=100&fit=crop'" class="w-10 h-10 rounded-full object-cover border border-stone-300 shadow-sm">
+                <h1 class="text-xl font-semibold tracking-wide text-stone-900">Casa Peter Frank</h1>
+            </div>
             <div class="flex items-center gap-3">
                 <nav class="flex gap-2 bg-stone-100 p-1 rounded-lg">
                     <button onclick="cambiarVista('servicios')" id="btn-servicios" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white text-stone-900 shadow-sm transition">Servicios Diarios</button>
@@ -27,8 +32,8 @@
         
         <!-- VISTA 1: SERVICIOS DIARIOS Y REGISTRO -->
         <div id="vista-servicios" class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <!-- Formulario de Registro / Edición -->
-            <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-1 h-fit">
+            <!-- Formulario de Registro / Edición Fijo -->
+            <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-1 h-fit sticky top-24">
                 <h2 id="titulo-form-servicio" class="text-base font-medium text-stone-900 mb-4">Registrar Servicio</h2>
                 
                 <form id="form-servicio" class="space-y-4">
@@ -113,7 +118,6 @@
                             <option value="anio">Por Año</option>
                         </select>
 
-                        <!-- Input dinámico según tipo de filtro -->
                         <input type="date" id="filtro-input-fecha" class="hidden px-2 py-1 text-xs border border-stone-300 rounded-lg bg-white">
                         
                         <select id="filtro-mes" class="hidden px-2 py-1 text-xs border border-stone-300 rounded-lg bg-white">
@@ -152,8 +156,8 @@
 
         <!-- VISTA 2: AGENDA DE CITAS -->
         <div id="vista-citas" class="hidden grid grid-cols-1 md:grid-cols-3 gap-8">
-            <!-- Formulario Agendar / Editar Cita -->
-            <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-1 h-fit">
+            <!-- Formulario Agendar / Editar Cita (Fijo) -->
+            <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-1 h-fit sticky top-24">
                 <h2 id="titulo-form-cita" class="text-base font-medium text-stone-900 mb-4">Agendar Nueva Cita</h2>
                 
                 <form id="form-cita" class="space-y-4">
@@ -187,7 +191,34 @@
                         <input type="text" id="cita_anticipo" placeholder="Ej. $100 en efectivo" class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm">
                     </div>
 
-                    <div class="flex gap-2">
+                    <!-- SECCIÓN OPCIONAL DE PAGO / SERVICIO UNIFICADO -->
+                    <div class="border-t border-stone-200 pt-3 mt-3">
+                        <button type="button" onclick="toggleSeccionPago()" class="text-xs font-semibold text-emerald-700 hover:text-emerald-900 flex items-center gap-1">
+                            ➕ Registrar pago / completar servicio (Opcional)
+                        </button>
+                        
+                        <div id="seccion-pago" class="hidden space-y-3 mt-3 bg-stone-50 p-3 rounded-xl border border-stone-200">
+                            <div>
+                                <label class="block text-[10px] font-medium text-stone-600 uppercase mb-1">Servicio Realizado</label>
+                                <select id="cita_servicio_id" class="w-full px-2 py-1.5 rounded-lg border border-stone-300 text-xs bg-white">
+                                    <option value="">Selecciona servicio</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-medium text-stone-600 uppercase mb-1">Método de Pago</label>
+                                <select id="cita_metodo_pago" class="w-full px-2 py-1.5 rounded-lg border border-stone-300 text-xs bg-white">
+                                    <option value="Efectivo">Efectivo</option>
+                                    <option value="Tarjeta">Tarjeta (Comisión 4%)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-medium text-stone-600 uppercase mb-1">Precio Cobrado ($)</label>
+                                <input type="number" step="0.5" id="cita_precio_cobrado" placeholder="Ej. 200" class="w-full px-2 py-1.5 rounded-lg border border-stone-300 text-xs">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-2 pt-2">
                         <button type="submit" id="btn-submit-cita" class="flex-1 py-2.5 bg-stone-900 text-white font-medium rounded-lg hover:bg-stone-800 transition text-sm tracking-wide">
                             Confirmar Cita
                         </button>
@@ -248,6 +279,7 @@
             await cargarHistorial();
             await cargarDisponibilidadDia();
 
+            // Formulario Servicio (Crear o Editar)
             document.getElementById("form-servicio").addEventListener("submit", async (e) => {
                 e.preventDefault();
                 const editId = document.getElementById("edit_servicio_id").value;
@@ -279,16 +311,23 @@
                 }
             });
 
+            // Formulario Cita (Crear o Editar con pago opcional unificado)
             document.getElementById("form-cita").addEventListener("submit", async (e) => {
                 e.preventDefault();
                 const editId = document.getElementById("edit_cita_id").value;
                 const barberoVal = document.getElementById("cita_barbero").value;
+                const servicioVal = document.getElementById("cita_servicio_id").value;
+                const precioVal = document.getElementById("cita_precio_cobrado").value;
+
                 const data = {
                     cliente_nombre: document.getElementById("cita_cliente").value,
                     fecha: document.getElementById("cita_fecha").value,
                     hora: document.getElementById("cita_hora").value,
                     anticipo: document.getElementById("cita_anticipo").value || "No",
-                    barbero_id: barberoVal ? parseInt(barberoVal) : null
+                    barbero_id: barberoVal ? parseInt(barberoVal) : null,
+                    servicio_id: servicioVal ? parseInt(servicioVal) : null,
+                    metodo_pago: document.getElementById("cita_metodo_pago").value,
+                    precio_cobrado: precioVal ? parseFloat(precioVal) : null
                 };
 
                 const url = editId ? `/citas/${editId}` : "/citas/";
@@ -300,21 +339,26 @@
                 const result = await res.json();
                 const alerta = document.getElementById("cita-alerta");
                 if (res.ok) {
-                    alerta.textContent = editId ? "¡Cita actualizada con éxito!" : "¡Cita agendada con éxito!";
+                    alerta.textContent = editId ? "¡Cita actualizada con éxito!" : "¡Cita agendada y registrada con éxito!";
                     alerta.className = "mt-4 p-3 rounded-lg text-xs text-center bg-emerald-50 text-emerald-800 border border-emerald-200 block";
                     
-                    // Restablecer automáticamente el filtro de visualización al día actual
                     const fechaHoyStr = new Date().toISOString().slice(0, 10);
                     document.getElementById("filtro-fecha-citas").value = fechaHoyStr;
                     
                     cancelarEdicionCita();
                     cargarDisponibilidadDia();
+                    cargarHistorial(); // Refrescar ingresos diarios también
                 } else {
                     alerta.textContent = result.error || "Error al procesar cita";
                     alerta.className = "mt-4 p-3 rounded-lg text-xs text-center bg-rose-50 text-rose-800 border border-rose-200 block";
                 }
             });
         });
+
+        function toggleSeccionPago() {
+            const seccion = document.getElementById("seccion-pago");
+            seccion.classList.toggle("hidden");
+        }
 
         function toggleFiltroCampos() {
             const tipo = document.getElementById("filtro-tipo").value;
@@ -370,9 +414,14 @@
 
             const resS = await fetch("/servicios-catalogo/");
             const catalogo = await resS.json();
+            
             const sSelect = document.getElementById("servicio_id");
             sSelect.innerHTML = '<option value="">Selecciona servicio</option>';
             catalogo.forEach(s => sSelect.innerHTML += `<option value="${s.id}">${s.nombre_servicio}</option>`);
+
+            const sCitaSelect = document.getElementById("cita_servicio_id");
+            sCitaSelect.innerHTML = '<option value="">Selecciona servicio</option>';
+            catalogo.forEach(s => sCitaSelect.innerHTML += `<option value="${s.id}">${s.nombre_servicio}</option>`);
         }
 
         async function cargarHistorial() {
@@ -493,9 +542,10 @@
                                 <div>
                                     <span class="font-semibold text-rose-900">🔴 ${esp.barbero_nombre}: ${esp.cliente}</span>
                                     <div class="text-[10px] text-rose-700">Anticipo: ${esp.anticipo}</div>
+                                    ${esp.precio_cobrado ? `<div class="text-[10px] font-semibold text-emerald-800">Pagado: $${esp.precio_cobrado} (${esp.metodo_pago})</div>` : ''}
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <button onclick="prepararEdicionCita(${esp.cita_id}, '${fecha}', '${bloque.hora}', '${esp.cliente}', '${esp.anticipo}', ${esp.barbero_id})" class="text-[10px] bg-amber-100 text-amber-800 px-2 py-1 rounded font-medium hover:bg-amber-200 transition">Editar</button>
+                                    <button onclick="prepararEdicionCita(${esp.cita_id}, '${fecha}', '${bloque.hora}', '${esp.cliente}', '${esp.anticipo}', ${esp.barbero_id}, ${esp.servicio_id}, '${esp.metodo_pago}', ${esp.precio_cobrado})" class="text-[10px] bg-amber-100 text-amber-800 px-2 py-1 rounded font-medium hover:bg-amber-200 transition">Editar</button>
                                     <button onclick="cancelarCita(${esp.cita_id})" class="text-[10px] bg-rose-100 text-rose-800 px-2 py-1 rounded font-medium hover:bg-rose-200 transition">Cancelar</button>
                                 </div>
                             </div>
@@ -557,7 +607,7 @@
             });
         }
 
-        function prepararEdicionCita(citaId, fecha, hora, cliente, anticipo, barberoId) {
+        function prepararEdicionCita(citaId, fecha, hora, cliente, anticipo, barberoId, servicioId, metodoPago, precioCobrado) {
             cambiarVista('citas');
             document.getElementById("edit_cita_id").value = citaId;
             document.getElementById("cita_cliente").value = cliente;
@@ -565,11 +615,18 @@
             document.getElementById("cita_anticipo").value = anticipo === 'No' ? '' : anticipo;
             document.getElementById("cita_barbero").value = barberoId;
 
+            if (servicioId && servicioId !== 'null') {
+                document.getElementById("cita_servicio_id").value = servicioId;
+                document.getElementById("cita_metodo_pago").value = metodoPago || "Efectivo";
+                document.getElementById("cita_precio_cobrado").value = precioCobrado !== 'null' ? precioCobrado : '';
+                document.getElementById("seccion-pago").classList.remove("hidden");
+            }
+
             actualizarHorariosDisponibles().then(() => {
                 document.getElementById("cita_hora").value = hora;
             });
 
-            document.getElementById("titulo-form-cita").textContent = "Editar Cita";
+            document.getElementById("titulo-form-cita").textContent = "Editar Cita / Registrar Pago";
             document.getElementById("btn-submit-cita").textContent = "Actualizar Cita";
             document.getElementById("btn-cancelar-edicion-cita").classList.remove("hidden");
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -581,6 +638,7 @@
             document.getElementById("titulo-form-cita").textContent = "Agendar Nueva Cita";
             document.getElementById("btn-submit-cita").textContent = "Confirmar Cita";
             document.getElementById("btn-cancelar-edicion-cita").classList.add("hidden");
+            document.getElementById("seccion-pago").classList.add("hidden");
             
             const hoyStr = new Date().toISOString().slice(0, 10);
             document.getElementById("cita_fecha").value = hoyStr;
@@ -597,6 +655,5 @@
             }
         }
     </script>
-
 </body>
 </html>
