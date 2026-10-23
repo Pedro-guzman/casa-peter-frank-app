@@ -253,7 +253,14 @@
         Casa Peter Frank &copy; 2026 - Sistema de Gestión Interna
     </footer>
 
-    <script>
+        <script>
+        // Función para obtener fecha local exacta en formato YYYY-MM-DD sin errores de zona horaria UTC
+        function obtenerFechaLocal(date = new Date()) {
+            const offset = date.getTimezoneOffset();
+            const localDate = new Date(date.getTime() - (offset*60*1000));
+            return localDate.toISOString().split('T')[0];
+        }
+
         function formatearHora12(hora24) {
             if (!hora24) return "";
             const [h, m] = hora24.split(":");
@@ -266,11 +273,10 @@
 
         document.addEventListener("DOMContentLoaded", async () => {
             const now = new Date();
-            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
             const hoyIso = now.toISOString().slice(0, 16);
             document.getElementById("fecha_hora").value = hoyIso;
             
-            const hoyFecha = now.toISOString().slice(0, 10);
+            const hoyFecha = obtenerFechaLocal(now);
             document.getElementById("cita_fecha").value = hoyFecha;
             document.getElementById("filtro-fecha-citas").value = hoyFecha;
             document.getElementById("filtro-input-fecha").value = hoyFecha;
@@ -313,7 +319,7 @@
                 }
             });
 
-            // Formulario Cita (Crear o Editar con pago opcional unificado)
+            // Formulario Cita (Crear o Editar)
             document.getElementById("form-cita").addEventListener("submit", async (e) => {
                 e.preventDefault();
                 const editId = document.getElementById("edit_cita_id").value;
@@ -344,8 +350,9 @@
                     alerta.textContent = editId ? "¡Cita actualizada con éxito!" : "¡Cita agendada y registrada con éxito!";
                     alerta.className = "mt-4 p-3 rounded-lg text-xs text-center bg-emerald-50 text-emerald-800 border border-emerald-200 block";
                     
-                    const fechaHoyStr = new Date().toISOString().slice(0, 10);
-                    document.getElementById("filtro-fecha-citas").value = fechaHoyStr;
+                    // MANTENER LA FECHA ACTUAL SELECCIONADA EN VEZ DE RESETEARLA A HOY (Ideal para agendar varias seguidas)
+                    const fechaActualSeleccionada = document.getElementById("cita_fecha").value;
+                    document.getElementById("filtro-fecha-citas").value = fechaActualSeleccionada;
                     
                     cancelarEdicionCita();
                     cargarDisponibilidadDia();
@@ -519,7 +526,7 @@
             document.getElementById("fecha_hora").value = now.toISOString().slice(0, 16);
         }
 
-                     async function cargarDisponibilidadDia() {
+        async function cargarDisponibilidadDia() {
             const inputFecha = document.getElementById("filtro-fecha-citas");
             const fecha = inputFecha.value;
             const contenedor = document.getElementById("contenedor-disponibilidad");
@@ -529,13 +536,11 @@
 
             contenedor.innerHTML = `<p class="text-xs text-stone-400 text-center py-6">Actualizando disponibilidad...</p>`;
             
-            // Formatear fecha para el título principal
             const [anio, mes, dia] = fecha.split("-");
             const fechaObj = new Date(anio, mes - 1, dia);
             const opcionesFecha = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
             labelActiva.textContent = `📅 Mostrando agenda para: ${fechaObj.toLocaleDateString('es-ES', opcionesFecha)}`;
 
-            // Formato corto para mostrar al costado de cada bloque (Ej. "24/10/2026")
             const fechaFormateadaCorta = `${dia}/${mes}/${anio}`;
 
             const res = await fetch(`/citas-disponibilidad/?fecha=${fecha}`);
@@ -560,9 +565,10 @@
                                     <div class="text-[10px] text-rose-700">Anticipo: ${esp.anticipo}</div>
                                     ${esp.precio_cobrado ? `<div class="text-[10px] font-semibold text-emerald-800">Pagado: $${esp.precio_cobrado} (${esp.metodo_pago})</div>` : ''}
                                 </div>
-                                <div class="flex items-center gap-2">
-                                    <button onclick="prepararEdicionCita(${esp.cita_id}, '${fecha}', '${bloque.hora}', '${esp.cliente}', '${esp.anticipo}', ${esp.barbero_id}, ${esp.servicio_id}, '${esp.metodo_pago}', ${esp.precio_cobrado})" class="text-[10px] bg-amber-100 text-amber-800 px-2 py-1 rounded font-medium hover:bg-amber-200 transition">Editar</button>
-                                    <button onclick="cancelarCita(${esp.cita_id})" class="text-[10px] bg-rose-100 text-rose-800 px-2 py-1 rounded font-medium hover:bg-rose-200 transition">Cancelar</button>
+                                <div class="flex items-center gap-1.5 flex-wrap justify-end">
+                                    <button onclick="prepararEdicionCita(${esp.cita_id}, '${fecha}', '${bloque.hora}', '${esp.cliente}', '${esp.anticipo}', ${esp.barbero_id}, ${esp.servicio_id}, '${esp.metodo_pago}', ${esp.precio_cobrado})" class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-1 rounded font-semibold hover:bg-emerald-200 transition">💵 Registrar Pago</button>
+                                    <button onclick="prepararEdicionCita(${esp.cita_id}, '${fecha}', '${bloque.hora}', '${esp.cliente}', '${esp.anticipo}', ${esp.barbero_id}, ${esp.servicio_id}, '${esp.metodo_pago}', ${esp.precio_cobrado})" class="text-[10px] bg-amber-100 text-amber-800 px-2.5 py-1 rounded font-medium hover:bg-amber-200 transition">Editar</button>
+                                    <button onclick="cancelarCita(${esp.cita_id})" class="text-[10px] bg-rose-100 text-rose-800 px-2.5 py-1 rounded font-medium hover:bg-rose-200 transition">Cancelar</button>
                                 </div>
                             </div>
                         `;
@@ -576,7 +582,6 @@
                     }
                 });
 
-                // Se añade la fecha exacta a un costado del horario para confirmación visual permanente
                 contenedor.innerHTML += `
                     <div class="border border-stone-200 rounded-xl p-3 bg-stone-50/50">
                         <div class="font-semibold text-xs text-stone-900 mb-2 flex justify-between items-center">
@@ -593,27 +598,44 @@
             actualizarHorariosDisponiblesDesdeBloques(data.bloques);
         }
 
-
-
-        function actualizarHorariosDisponiblesDesdeBloques(bloques) {
+        // Modificado para aceptar la hora actual de la cita y asegurar que aparezca en el select aunque esté ocupada
+        function actualizarHorariosDisponiblesDesdeBloques(bloques, horaForzada = null) {
             const selectHora = document.getElementById("cita_hora");
+            const horaActualSeleccionada = horaForzada || selectHora.value;
             selectHora.innerHTML = '<option value="">Selecciona una hora</option>';
+            
+            let horaIncluida = false;
+
             bloques.forEach(b => {
                 const libres = b.espacios.filter(e => !e.ocupado).length;
-                if (libres > 0) {
+                const esLaHoraActual = (b.hora === horaActualSeleccionada);
+                
+                if (libres > 0 || esLaHoraActual) {
                     const hora12 = formatearHora12(b.hora);
-                    selectHora.innerHTML += `<option value="${b.hora}">${hora12} (${libres} espacio${libres > 1 ? 's' : ''} libre${libres > 1 ? 's' : ''})</option>`;
+                    const etiquetaLibres = esLaHoraActual ? ' (Hora actual de la cita)' : ` (${libres} espacio${libres > 1 ? 's' : ''} libre${libres > 1 ? 's' : ''})`;
+                    selectHora.innerHTML += `<option value="${b.hora}">${hora12}${etiquetaLibres}</option>`;
+                    if (esLaHoraActual) horaIncluida = true;
                 }
             });
+
+            // Si por alguna razón la hora forzada no estaba en el listado, la agregamos manualmente para que no se pierda
+            if (horaForzada && !horaIncluida) {
+                const hora12 = formatearHora12(horaForzada);
+                selectHora.innerHTML += `<option value="${horaForzada}">${hora12} (Hora actual de la cita)</option>`;
+            }
+
+            if (horaActualSeleccionada) {
+                selectHora.value = horaActualSeleccionada;
+            }
         }
 
-        async function actualizarHorariosDisponibles() {
+        async function actualizarHorariosDisponibles(horaForzada = null) {
             const fecha = document.getElementById("cita_fecha").value;
             if (!fecha) return;
             const res = await fetch(`/citas-disponibilidad/?fecha=${fecha}`);
             const data = await res.json();
             if (data.bloques) {
-                actualizarHorariosDisponiblesDesdeBloques(data.bloques);
+                actualizarHorariosDisponiblesDesdeBloques(data.bloques, horaForzada);
             }
         }
 
@@ -635,14 +657,18 @@
             document.getElementById("cita_anticipo").value = anticipo === 'No' ? '' : anticipo;
             document.getElementById("cita_barbero").value = barberoId;
 
-            if (servicioId && servicioId !== 'null') {
+            if (servicioId && servicioId !== 'null' && servicioId !== 'undefined') {
                 document.getElementById("cita_servicio_id").value = servicioId;
                 document.getElementById("cita_metodo_pago").value = metodoPago || "Efectivo";
-                document.getElementById("cita_precio_cobrado").value = precioCobrado !== 'null' ? precioCobrado : '';
+                document.getElementById("cita_precio_cobrado").value = precioCobrado !== 'null' && precioCobrado !== 'undefined' ? precioCobrado : '';
+                document.getElementById("seccion-pago").classList.remove("hidden");
+            } else {
+                // Si entra a registrar pago y estaba oculto, abrimos la sección de pago automáticamente para mayor comodidad
                 document.getElementById("seccion-pago").classList.remove("hidden");
             }
 
-            actualizarHorariosDisponibles().then(() => {
+            // Forzar que la hora actual de la cita aparezca disponible y se seleccione correctamente
+            actualizarHorariosDisponibles(hora).then(() => {
                 document.getElementById("cita_hora").value = hora;
             });
 
@@ -660,8 +686,9 @@
             document.getElementById("btn-cancelar-edicion-cita").classList.add("hidden");
             document.getElementById("seccion-pago").classList.add("hidden");
             
-            const hoyStr = new Date().toISOString().slice(0, 10);
-            document.getElementById("cita_fecha").value = hoyStr;
+            // Mantiene la fecha seleccionada actual en lugar de regresarla forzosamente a hoy
+            const fechaActualSeleccionada = document.getElementById("filtro-fecha-citas").value;
+            document.getElementById("cita_fecha").value = fechaActualSeleccionada;
             actualizarHorariosDisponibles();
         }
 
@@ -675,5 +702,6 @@
             }
         }
     </script>
+
 </body>
 </html>
