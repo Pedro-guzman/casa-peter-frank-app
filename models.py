@@ -37,3 +37,12 @@ class CitaModel(Base):
     metodo_pago = Column(String, nullable=True)
     precio_cobrado = Column(Float, nullable=True)
     servicio_diario_id = Column(Integer, ForeignKey("servicios_diarios.id"), nullable=True) # Vinculo opcional con ingresos
+
+class GastoModel(Base):
+    __tablename__ = "gastos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    fecha = Column(String, index=True)          # Formato "YYYY-MM-DD"
+    categoria = Column(String, index=True)      # Personal, Renta, Luz, etc.
+    monto = Column(Float)
+    descripcion = Column(String, nullable=True)

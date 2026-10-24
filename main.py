@@ -6,9 +6,10 @@ from fastapi.requests import Request
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, date
 from database import get_db, SessionLocal, engine, Base
-from models import BarberoModel, ServicioCatalogoModel, ServicioDiarioModel, CitaModel
+from models import BarberoModel, ServicioCatalogoModel, ServicioDiarioModel, CitaModel, GastoModel
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
+from pydantic import BaseModel
 import io
 import csv
 
@@ -387,3 +388,82 @@ def exportar_csv(db: Session = Depends(get_db)):
         return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=reporte_casa_peter_frank.csv"})
     except Exception as e:
         return {"error": str(e)}, 500
+
+# Esquema Pydantic para validar la entrada de gastos
+class GastoSchema(BaseModel):
+    fecha: str
+    categoria: str
+    monto: float
+    descripcion: Optional[str] = None
+
+@app.post("/gastos/")
+def crear_gasto(gasto: GastoSchema, db: Session = Depends(get_db)):
+    nuevo_gasto = GastoModel(
+        fecha=gasto.fecha,
+        categoria=gasto.categoria,
+        monto=gasto.monto,
+        descripcion=gasto.descripcion
+    )
+    db.add(nuevo_gasto)
+    db.commit()
+    db.refresh(nuevo_gasto)
+    return {"mensaje": "Gasto registrado con éxito", "id": nuevo_gasto.id}
+
+@app.get("/gastos/")
+def listar_gastos(
+    filtro_tipo: str = "todos",
+    fecha_ref: Optional[str] = None,
+    mes: Optional[int] = None,
+    anio: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    query = db.query(GastoModel)
+    
+    if filtro_tipo == "dia" and fecha_ref:
+        query = query.filter(GastoModel.fecha == fecha_ref)
+    elif filtro_tipo == "mes" and mes and anio:
+        mes_str = f"{anio}-{str(mes).zfill(2)}"
+        query = query.filter(GastoModel.fecha.like(f"{mes_str}%"))
+    elif filtro_tipo == "anio" and anio:
+        query = query.filter(GastoModel.fecha.like(f"{anio}%"))
+        
+    return query.all()
+
+@app.get("/balance-financiero/")
+def obtener_balance_financiero(
+    filtro_tipo: str = "todos",
+    fecha_ref: Optional[str] = None,
+    mes: Optional[int] = None,
+    anio: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    # 1. Calcular Total de Gastos filtrados
+    query_gastos = db.query(GastoModel)
+    if filtro_tipo == "dia" and fecha_ref:
+        query_gastos = query_gastos.filter(GastoModel.fecha == fecha_ref)
+    elif filtro_tipo == "mes" and mes and anio:
+        mes_str = f"{anio}-{str(mes).zfill(2)}"
+        query_gastos = query_gastos.filter(GastoModel.fecha.like(f"{mes_str}%"))
+    elif filtro_tipo == "anio" and anio:
+        query_gastos = query_gastos.filter(GastoModel.fecha.like(f"{anio}%"))
+    
+    total_gastos = sum(g.monto for g in query_gastos.all())
+
+    # 2. Calcular Total de Ingresos Netos (reutilizando la misma lógica de servicios)
+    query_ingresos = db.query(ServicioDiarioModel)
+    if filtro_tipo == "dia" and fecha_ref:
+        query_ingresos = query_ingresos.filter(ServicioDiarioModel.fecha_hora.like(f"{fecha_ref}%"))
+    elif filtro_tipo == "mes" and mes and anio:
+        mes_str = f"{anio}-{str(mes).zfill(2)}"
+        query_ingresos = query_ingresos.filter(ServicioDiarioModel.fecha_hora.like(f"{mes_str}%"))
+    elif filtro_tipo == "anio" and anio:
+        query_ingresos = query_ingresos.filter(ServicioDiarioModel.fecha_hora.like(f"{anio}%"))
+
+    total_ingresos = sum(s.total_cobrado_neto for s in query_ingresos.all())
+    ganancia_neta = total_ingresos - total_gastos
+
+    return {
+        "total_ingresos": total_ingresos,
+        "total_gastos": total_gastos,
+        "ganancia_neta": ganancia_neta
+    }

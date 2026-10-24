@@ -18,8 +18,9 @@
             </div>
             <div class="flex items-center gap-3">
                <nav class="flex gap-2 bg-stone-100 p-1 rounded-lg">
-                <button onclick="cambiarVista('citas')" id="btn-citas" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white text-stone-900 shadow-sm transition">Agenda de Citas</button>
-                    <button onclick="cambiarVista('servicios')" id="btn-servicios" class="px-3 py-1.5 text-xs font-medium rounded-md text-stone-600 hover:text-stone-900 transition">Servicios Diarios</button> 
+                    <button onclick="cambiarVista('citas')" id="btn-citas" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white text-stone-900 shadow-sm transition">Agenda de Citas</button>
+                    <button onclick="cambiarVista('servicios')" id="btn-servicios" class="px-3 py-1.5 text-xs font-medium rounded-md text-stone-600 hover:text-stone-900 transition">Servicios Diarios</button>
+                    <button onclick="cambiarVista('gastos')" id="btn-gastos" class="px-3 py-1.5 text-xs font-medium rounded-md text-stone-600 hover:text-stone-900 transition">Gastos y Balance</button>
                 </nav>
 
                 <a href="/exportar-csv/" class="bg-emerald-700 text-white text-xs font-medium px-3 py-2 rounded-lg hover:bg-emerald-800 transition tracking-wide">
@@ -31,9 +32,9 @@
 
     <main class="max-w-6xl mx-auto w-full p-6 my-6">
         
-        <!-- VISTA 1: SERVICIOS DIARIOS Y REGISTRO (INICIA OCULTA) -->
+        <!-- VISTA 1: SERVICIOS DIARIOS Y REGISTRO -->
         <div id="vista-servicios" class="hidden grid grid-cols-1 md:grid-cols-3 gap-8">
-            <!-- Formulario de Registro / Edición (Sticky solo en PC) -->
+            <!-- Formulario de Registro / Edición -->
             <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-1 h-fit md:sticky md:top-24">
                 <h2 id="titulo-form-servicio" class="text-base font-medium text-stone-900 mb-4">Registrar Servicio</h2>
                 
@@ -150,9 +151,9 @@
             </section>
         </div>
 
-        <!-- VISTA 2: AGENDA DE CITAS (INICIA VISIBLE POR DEFECTO) -->
+        <!-- VISTA 2: AGENDA DE CITAS (VISIBLE POR DEFECTO) -->
         <div id="vista-citas" class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <!-- Formulario Agendar / Editar Cita (Sticky solo en PC) -->
+            <!-- Formulario Agendar / Editar Cita -->
             <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-1 h-fit md:sticky md:top-24">
                 <h2 id="titulo-form-cita" class="text-base font-medium text-stone-900 mb-4">Agendar Nueva Cita</h2>
                 
@@ -187,7 +188,7 @@
                         <input type="text" id="cita_anticipo" placeholder="Ej. $100 en efectivo" class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm">
                     </div>
 
-                    <!-- SECCIÓN OPCIONAL DE PAGO / SERVICIO UNIFICADO -->
+                    <!-- SECCIÓN OPCIONAL DE PAGO -->
                     <div class="border-t border-stone-200 pt-3 mt-3">
                         <button type="button" onclick="toggleSeccionPago()" class="text-xs font-semibold text-emerald-700 hover:text-emerald-900 flex items-center gap-1">
                             ➕ Registrar pago / completar servicio (Opcional)
@@ -226,10 +227,8 @@
                 <div id="cita-alerta" class="mt-4 hidden p-3 rounded-lg text-xs text-center"></div>
             </section>
 
-                       <!-- Visualización de Disponibilidad por Día -->
-                        <!-- Visualización de Disponibilidad por Día -->
+            <!-- Visualización de Disponibilidad por Día -->
             <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-2">
-                <!-- Encabezado Sticky de Disponibilidad para que nunca se pierda al hacer scroll -->
                 <div class="sticky top-20 bg-white/95 backdrop-blur z-20 pb-4 mb-4 border-b border-stone-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
                         <h2 class="text-base font-medium text-stone-900">Disponibilidad de Citas</h2>
@@ -244,7 +243,94 @@
                     <p class="text-xs text-stone-400 text-center py-6">Selecciona una fecha para ver los horarios y espacios disponibles.</p>
                 </div>
             </section>
+        </div>
 
+        <!-- VISTA 3: GASTOS Y BALANCE FINANCIERO -->
+        <div id="vista-gastos" class="hidden grid grid-cols-1 md:grid-cols-3 gap-8">
+            <!-- Formulario de Registro de Gastos -->
+            <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-1 h-fit md:sticky md:top-24">
+                <h2 class="text-base font-medium text-stone-900 mb-4">Registrar Gasto</h2>
+                <form id="form-gasto" class="space-y-4" onsubmit="registrarGasto(event)">
+                    <div>
+                        <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Fecha</label>
+                        <input type="date" id="gasto_fecha" required class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm bg-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Categoría</label>
+                        <select id="gasto_categoria" required class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm bg-white">
+                            <option value="">Selecciona categoría</option>
+                            <option value="Personal">Personal</option>
+                            <option value="Renta">Renta</option>
+                            <option value="Luz">Luz</option>
+                            <option value="Agua">Agua</option>
+                            <option value="Internet">Internet</option>
+                            <option value="Insumos">Insumos</option>
+                            <option value="Recolección">Recolección</option>
+                            <option value="Impuestos">Impuestos</option>
+                            <option value="Contadora">Contadora</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Monto ($)</label>
+                        <input type="number" step="0.5" id="gasto_monto" required placeholder="Ej. 1500" class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Descripción (Opcional)</label>
+                        <input type="text" id="gasto_descripcion" placeholder="Detalle del gasto" class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm">
+                    </div>
+                    <button type="submit" class="w-full py-2.5 bg-stone-900 text-white font-medium rounded-lg hover:bg-stone-800 transition text-sm">
+                        Guardar Gasto
+                    </button>
+                </form>
+            </section>
+
+            <!-- Historial y Balance -->
+            <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-2 space-y-6">
+                <!-- Panel Financiero Resumen -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="bg-stone-50 border border-stone-200 p-3 rounded-xl">
+                        <span class="block text-[10px] uppercase font-semibold text-stone-500">Ingresos Totales</span>
+                        <span id="bal-ingresos" class="text-base font-bold text-stone-900">$0.00</span>
+                    </div>
+                    <div class="bg-rose-50 border border-rose-200 p-3 rounded-xl">
+                        <span class="block text-[10px] uppercase font-semibold text-rose-700">Gastos Totales</span>
+                        <span id="bal-gastos" class="text-base font-bold text-rose-800">$0.00</span>
+                    </div>
+                    <div class="bg-emerald-50 border border-emerald-200 p-3 rounded-xl">
+                        <span class="block text-[10px] uppercase font-semibold text-emerald-700">Ganancia Neta Final</span>
+                        <span id="bal-neto" class="text-base font-bold text-emerald-800">$0.00</span>
+                    </div>
+                </div>
+
+                <!-- Tabla y Filtros -->
+                <div class="flex justify-between items-center border-b border-stone-200 pb-4">
+                    <h2 class="text-base font-medium text-stone-900">Historial de Gastos</h2>
+                    <div class="flex gap-2 items-center">
+                        <select id="filtro-gasto-tipo" onchange="cargarGastos()" class="px-2 py-1 text-xs border border-stone-300 rounded-lg bg-white">
+                            <option value="todos">Todo el historial</option>
+                            <option value="dia">Por Día</option>
+                            <option value="mes">Por Mes</option>
+                            <option value="anio">Por Año</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="border-b border-stone-200 text-stone-500 uppercase tracking-wider">
+                                <th class="py-2 px-2">Fecha</th>
+                                <th class="py-2 px-2">Categoría</th>
+                                <th class="py-2 px-2">Descripción</th>
+                                <th class="py-2 px-2 text-right">Monto</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-gastos" class="divide-y divide-stone-100 text-stone-700">
+                            <tr><td colspan="4" class="py-4 text-center text-stone-400">No hay gastos registrados.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
         </div>
 
     </main>
@@ -253,8 +339,7 @@
         Casa Peter Frank &copy; 2026 - Sistema de Gestión Interna
     </footer>
 
-        <script>
-        // Función para obtener fecha local exacta en formato YYYY-MM-DD sin errores de zona horaria UTC
+    <script>
         function obtenerFechaLocal(date = new Date()) {
             const offset = date.getTimezoneOffset();
             const localDate = new Date(date.getTime() - (offset*60*1000));
@@ -287,7 +372,7 @@
             await cargarHistorial();
             await cargarDisponibilidadDia();
 
-            // Formulario Servicio (Crear o Editar)
+            // Formulario Servicio
             document.getElementById("form-servicio").addEventListener("submit", async (e) => {
                 e.preventDefault();
                 const editId = document.getElementById("edit_servicio_id").value;
@@ -319,7 +404,7 @@
                 }
             });
 
-            // Formulario Cita (Crear o Editar)
+            // Formulario Cita
             document.getElementById("form-cita").addEventListener("submit", async (e) => {
                 e.preventDefault();
                 const editId = document.getElementById("edit_cita_id").value;
@@ -350,7 +435,6 @@
                     alerta.textContent = editId ? "¡Cita actualizada con éxito!" : "¡Cita agendada y registrada con éxito!";
                     alerta.className = "mt-4 p-3 rounded-lg text-xs text-center bg-emerald-50 text-emerald-800 border border-emerald-200 block";
                     
-                    // MANTENER LA FECHA ACTUAL SELECCIONADA EN VEZ DE RESETEARLA A HOY (Ideal para agendar varias seguidas)
                     const fechaActualSeleccionada = document.getElementById("cita_fecha").value;
                     document.getElementById("filtro-fecha-citas").value = fechaActualSeleccionada;
                     
@@ -389,23 +473,36 @@
             }
         }
 
+        // Función de navegación de pestañas única y blindada
         function cambiarVista(vista) {
             const vServicios = document.getElementById("vista-servicios");
             const vCitas = document.getElementById("vista-citas");
+            const vGastos = document.getElementById("vista-gastos");
             const btnS = document.getElementById("btn-servicios");
             const btnC = document.getElementById("btn-citas");
+            const btnG = document.getElementById("btn-gastos");
 
-            if (vista === 'servicios') {
+            if (vServicios) vServicios.classList.add('hidden');
+            if (vCitas) vCitas.classList.add('hidden');
+            if (vGastos) vGastos.classList.add('hidden');
+            
+            if (btnS) btnS.className = "px-3 py-1.5 text-xs font-medium rounded-md text-stone-600 hover:text-stone-900 transition";
+            if (btnC) btnC.className = "px-3 py-1.5 text-xs font-medium rounded-md text-stone-600 hover:text-stone-900 transition";
+            if (btnG) btnG.className = "px-3 py-1.5 text-xs font-medium rounded-md text-stone-600 hover:text-stone-900 transition";
+
+            if (vista === 'servicios' && vServicios) {
                 vServicios.classList.remove('hidden');
-                vCitas.classList.add('hidden');
-                btnS.className = "px-3 py-1.5 text-xs font-medium rounded-md bg-white text-stone-900 shadow-sm transition";
-                btnC.className = "px-3 py-1.5 text-xs font-medium rounded-md text-stone-600 hover:text-stone-900 transition";
-            } else {
+                if (btnS) btnS.className = "px-3 py-1.5 text-xs font-medium rounded-md bg-white text-stone-900 shadow-sm transition";
+            } else if (vista === 'citas' && vCitas) {
                 vCitas.classList.remove('hidden');
-                vServicios.classList.add('hidden');
-                btnC.className = "px-3 py-1.5 text-xs font-medium rounded-md bg-white text-stone-900 shadow-sm transition";
-                btnS.className = "px-3 py-1.5 text-xs font-medium rounded-md text-stone-600 hover:text-stone-900 transition";
-                cargarDisponibilidadDia();
+                if (btnC) btnC.className = "px-3 py-1.5 text-xs font-medium rounded-md bg-white text-stone-900 shadow-sm transition";
+                if (typeof cargarDisponibilidadDia === 'function') cargarDisponibilidadDia();
+            } else if (vista === 'gastos' && vGastos) {
+                vGastos.classList.remove('hidden');
+                if (btnG) btnG.className = "px-3 py-1.5 text-xs font-medium rounded-md bg-white text-stone-900 shadow-sm transition";
+                const inputFechaGasto = document.getElementById("gasto_fecha");
+                if (inputFechaGasto) inputFechaGasto.value = obtenerFechaLocal();
+                if (typeof cargarGastos === 'function') cargarGastos();
             }
         }
 
@@ -598,7 +695,6 @@
             actualizarHorariosDisponiblesDesdeBloques(data.bloques);
         }
 
-        // Modificado para aceptar la hora actual de la cita y asegurar que aparezca en el select aunque esté ocupada
         function actualizarHorariosDisponiblesDesdeBloques(bloques, horaForzada = null) {
             const selectHora = document.getElementById("cita_hora");
             const horaActualSeleccionada = horaForzada || selectHora.value;
@@ -618,7 +714,6 @@
                 }
             });
 
-            // Si por alguna razón la hora forzada no estaba en el listado, la agregamos manualmente para que no se pierda
             if (horaForzada && !horaIncluida) {
                 const hora12 = formatearHora12(horaForzada);
                 selectHora.innerHTML += `<option value="${horaForzada}">${hora12} (Hora actual de la cita)</option>`;
@@ -663,11 +758,9 @@
                 document.getElementById("cita_precio_cobrado").value = precioCobrado !== 'null' && precioCobrado !== 'undefined' ? precioCobrado : '';
                 document.getElementById("seccion-pago").classList.remove("hidden");
             } else {
-                // Si entra a registrar pago y estaba oculto, abrimos la sección de pago automáticamente para mayor comodidad
                 document.getElementById("seccion-pago").classList.remove("hidden");
             }
 
-            // Forzar que la hora actual de la cita aparezca disponible y se seleccione correctamente
             actualizarHorariosDisponibles(hora).then(() => {
                 document.getElementById("cita_hora").value = hora;
             });
@@ -686,7 +779,6 @@
             document.getElementById("btn-cancelar-edicion-cita").classList.add("hidden");
             document.getElementById("seccion-pago").classList.add("hidden");
             
-            // Mantiene la fecha seleccionada actual en lugar de regresarla forzosamente a hoy
             const fechaActualSeleccionada = document.getElementById("filtro-fecha-citas").value;
             document.getElementById("cita_fecha").value = fechaActualSeleccionada;
             actualizarHorariosDisponibles();
@@ -700,6 +792,77 @@
             } else {
                 alert("Error al cancelar la cita");
             }
+        }
+
+        async function registrarGasto(e) {
+            e.preventDefault();
+            const data = {
+                fecha: document.getElementById("gasto_fecha").value,
+                categoria: document.getElementById("gasto_categoria").value,
+                monto: parseFloat(document.getElementById("gasto_monto").value),
+                descripcion: document.getElementById("gasto_descripcion").value || null
+            };
+
+            const res = await fetch("/gastos/", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data)
+            });
+
+            if (res.ok) {
+                document.getElementById("form-gasto").reset();
+                document.getElementById("gasto_fecha").value = obtenerFechaLocal();
+                cargarGastos();
+            } else {
+                alert("Error al registrar el gasto");
+            }
+        }
+
+        async function cargarGastos() {
+            const tipo = document.getElementById("filtro-gasto-tipo").value;
+            let url = `/gastos/?filtro_tipo=${tipo}`;
+
+            if (tipo === "dia") {
+                const fecha = document.getElementById("filtro-input-fecha")?.value || obtenerFechaLocal();
+                url += `&fecha_ref=${fecha}`;
+            } else if (tipo === "mes") {
+                const mes = document.getElementById("filtro-mes")?.value || new Date().getMonth() + 1;
+                const anio = document.getElementById("filtro-anio")?.value || new Date().getFullYear();
+                url += `&mes=${mes}&anio=${anio}`;
+            } else if (tipo === "anio") {
+                const anio = document.getElementById("filtro-anio")?.value || new Date().getFullYear();
+                url += `&anio=${anio}`;
+            }
+
+            const resGastos = await fetch(url);
+            const gastos = await resGastos.json();
+            const tbody = document.getElementById("tabla-gastos");
+
+            if (gastos.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-stone-400">No hay gastos registrados.</td></tr>`;
+            } else {
+                tbody.innerHTML = "";
+                gastos.forEach(g => {
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-stone-50 transition">
+                            <td class="py-2.5 px-2">${g.fecha}</td>
+                            <td class="py-2.5 px-2 font-medium"><span class="px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-800">${g.categoria}</span></td>
+                            <td class="py-2.5 px-2 text-stone-500">${g.descripcion || '-'}</td>
+                            <td class="py-2.5 px-2 text-right font-semibold text-rose-700">-$${g.monto.toFixed(2)}</td>
+                        </tr>
+                    `;
+                });
+            }
+
+            const resBalance = await fetch(`/balance-financiero/?filtro_tipo=${tipo}`);
+            const balance = await resBalance.json();
+
+            document.getElementById("bal-ingresos").textContent = `$${balance.total_ingresos.toFixed(2)}`;
+            document.getElementById("bal-gastos").textContent = `$${balance.total_gastos.toFixed(2)}`;
+            
+            const elNeto = document.getElementById("bal-neto");
+            elNeto.textContent = `$${balance.ganancia_neta.toFixed(2)}`;
+            elNeto.className = balance.ganancia_neta >= 0 ? "text-base font-bold text-emerald-800" : "text-base font-bold text-rose-800";
         }
     </script>
 
