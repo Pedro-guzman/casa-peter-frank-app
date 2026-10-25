@@ -623,7 +623,7 @@
             document.getElementById("fecha_hora").value = now.toISOString().slice(0, 16);
         }
 
-        async function cargarDisponibilidadDia() {
+                async function cargarDisponibilidadDia() {
             const inputFecha = document.getElementById("filtro-fecha-citas");
             const fecha = inputFecha.value;
             const contenedor = document.getElementById("contenedor-disponibilidad");
@@ -633,67 +633,81 @@
 
             contenedor.innerHTML = `<p class="text-xs text-stone-400 text-center py-6">Actualizando disponibilidad...</p>`;
             
-            const [anio, mes, dia] = fecha.split("-");
-            const fechaObj = new Date(anio, mes - 1, dia);
-            const opcionesFecha = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-            labelActiva.textContent = `📅 Mostrando agenda para: ${fechaObj.toLocaleDateString('es-ES', opcionesFecha)}`;
+            try {
+                const [anio, mes, dia] = fecha.split("-");
+                const fechaObj = new Date(anio, mes - 1, dia);
+                const opcionesFecha = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                labelActiva.textContent = `📅 Mostrando agenda para: ${fechaObj.toLocaleDateString('es-ES', opcionesFecha)}`;
 
-            const fechaFormateadaCorta = `${dia}/${mes}/${anio}`;
+                const fechaFormateadaCorta = `${dia}/${mes}/${anio}`;
 
-            const res = await fetch(`/citas-disponibilidad/?fecha=${fecha}`);
-            const data = await res.json();
-
-            if (data.mensaje) {
-                contenedor.innerHTML = `<p class="text-xs text-rose-600 text-center py-6 font-medium">${data.mensaje}</p>`;
-                return;
-            }
-
-            contenedor.innerHTML = "";
-            data.bloques.forEach(bloque => {
-                const hora12 = formatearHora12(bloque.hora);
-                let htmlEspacios = "";
+                const res = await fetch(`/citas-disponibilidad/?fecha=${fecha}`);
+                if (!res.ok) throw new Error("Error en la respuesta del servidor");
                 
-                bloque.espacios.forEach(esp => {
-                    if (esp.ocupado) {
-                        htmlEspacios += `
-                            <div class="bg-rose-50 border border-rose-200 rounded-lg p-2.5 text-xs flex justify-between items-center">
-                                <div>
-                                    <span class="font-semibold text-rose-900">🔴 ${esp.barbero_nombre}: ${esp.cliente}</span>
-                                    <div class="text-[10px] text-rose-700">Anticipo: ${esp.anticipo}</div>
-                                    ${esp.precio_cobrado ? `<div class="text-[10px] font-semibold text-emerald-800">Pagado: $${esp.precio_cobrado} (${esp.metodo_pago})</div>` : ''}
+                const data = await res.json();
+
+                if (data.mensaje) {
+                    contenedor.innerHTML = `<p class="text-xs text-rose-600 text-center py-6 font-medium">${data.mensaje}</p>`;
+                    return;
+                }
+
+                contenedor.innerHTML = "";
+                data.bloques.forEach(bloque => {
+                    const hora12 = formatearHora12(bloque.hora);
+                    let htmlEspacios = "";
+                    
+                    bloque.espacios.forEach(esp => {
+                        if (esp.ocupado) {
+                            htmlEspacios += `
+                                <div class="bg-rose-50 border border-rose-200 rounded-lg p-2.5 text-xs flex justify-between items-center">
+                                    <div>
+                                        <span class="font-semibold text-rose-900">🔴 ${esp.barbero_nombre}: ${esp.cliente}</span>
+                                        <div class="text-[10px] text-rose-700">Anticipo: ${esp.anticipo}</div>
+                                        ${esp.precio_cobrado ? `<div class="text-[10px] font-semibold text-emerald-800">Pagado: $${esp.precio_cobrado} (${esp.metodo_pago})</div>` : ''}
+                                    </div>
+                                    <div class="flex items-center gap-1.5 flex-wrap justify-end">
+                                        <button onclick="prepararEdicionCita(${esp.cita_id}, '${fecha}', '${bloque.hora}', '${esp.cliente}', '${esp.anticipo}', ${esp.barbero_id}, ${esp.servicio_id}, '${esp.metodo_pago}', ${esp.precio_cobrado})" class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-1 rounded font-semibold hover:bg-emerald-200 transition">💵 Registrar Pago</button>
+                                        <button onclick="prepararEdicionCita(${esp.cita_id}, '${fecha}', '${bloque.hora}', '${esp.cliente}', '${esp.anticipo}', ${esp.barbero_id}, ${esp.servicio_id}, '${esp.metodo_pago}', ${esp.precio_cobrado})" class="text-[10px] bg-amber-100 text-amber-800 px-2.5 py-1 rounded font-medium hover:bg-amber-200 transition">Editar</button>
+                                        <button onclick="cancelarCita(${esp.cita_id})" class="text-[10px] bg-rose-100 text-rose-800 px-2.5 py-1 rounded font-medium hover:bg-rose-200 transition">Cancelar</button>
+                                    </div>
                                 </div>
-                                <div class="flex items-center gap-1.5 flex-wrap justify-end">
-                                    <button onclick="prepararEdicionCita(${esp.cita_id}, '${fecha}', '${bloque.hora}', '${esp.cliente}', '${esp.anticipo}', ${esp.barbero_id}, ${esp.servicio_id}, '${esp.metodo_pago}', ${esp.precio_cobrado})" class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-1 rounded font-semibold hover:bg-emerald-200 transition">💵 Registrar Pago</button>
-                                    <button onclick="prepararEdicionCita(${esp.cita_id}, '${fecha}', '${bloque.hora}', '${esp.cliente}', '${esp.anticipo}', ${esp.barbero_id}, ${esp.servicio_id}, '${esp.metodo_pago}', ${esp.precio_cobrado})" class="text-[10px] bg-amber-100 text-amber-800 px-2.5 py-1 rounded font-medium hover:bg-amber-200 transition">Editar</button>
-                                    <button onclick="cancelarCita(${esp.cita_id})" class="text-[10px] bg-rose-100 text-rose-800 px-2.5 py-1 rounded font-medium hover:bg-rose-200 transition">Cancelar</button>
+                            `;
+                        } else {
+                            htmlEspacios += `
+                                <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 text-xs flex justify-between items-center">
+                                    <span class="font-semibold text-emerald-900">🟢 ${esp.barbero_nombre}: Libre</span>
+                                    <button onclick="seleccionarHora('${bloque.hora}', ${esp.barbero_id})" class="bg-emerald-700 text-white text-[10px] px-2.5 py-1 rounded-md hover:bg-emerald-800 transition">Agendar aquí</button>
                                 </div>
+                            `;
+                        }
+                    });
+
+                    contenedor.innerHTML += `
+                        <div class="border border-stone-200 rounded-xl p-3 bg-stone-50/50">
+                            <div class="font-semibold text-xs text-stone-900 mb-2 flex justify-between items-center">
+                                <span class="flex items-center gap-1.5">⏰ ${hora12}</span>
+                                <span class="bg-stone-200/80 text-stone-700 px-2 py-0.5 rounded text-[10px] font-mono tracking-wider">📅 Fecha: ${fechaFormateadaCorta}</span>
                             </div>
-                        `;
-                    } else {
-                        htmlEspacios += `
-                            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 text-xs flex justify-between items-center">
-                                <span class="font-semibold text-emerald-900">🟢 ${esp.barbero_nombre}: Libre</span>
-                                <button onclick="seleccionarHora('${bloque.hora}', ${esp.barbero_id})" class="bg-emerald-700 text-white text-[10px] px-2.5 py-1 rounded-md hover:bg-emerald-800 transition">Agendar aquí</button>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                ${htmlEspacios}
                             </div>
-                        `;
-                    }
+                        </div>
+                    `;
                 });
 
-                contenedor.innerHTML += `
-                    <div class="border border-stone-200 rounded-xl p-3 bg-stone-50/50">
-                        <div class="font-semibold text-xs text-stone-900 mb-2 flex justify-between items-center">
-                            <span class="flex items-center gap-1.5">⏰ ${hora12}</span>
-                            <span class="bg-stone-200/80 text-stone-700 px-2 py-0.5 rounded text-[10px] font-mono tracking-wider">📅 Fecha: ${fechaFormateadaCorta}</span>
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            ${htmlEspacios}
-                        </div>
+                actualizarHorariosDisponiblesDesdeBloques(data.bloques);
+
+            } catch (error) {
+                console.error("Error al cargar disponibilidad:", error);
+                contenedor.innerHTML = `
+                    <div class="text-center py-6 space-y-2">
+                        <p class="text-xs text-rose-600 font-medium">No se pudo cargar la disponibilidad en este momento.</p>
+                        <button onclick="cargarDisponibilidadDia()" class="px-3 py-1 bg-stone-900 text-white text-xs rounded-lg hover:bg-stone-800 transition">Reintentar</button>
                     </div>
                 `;
-            });
-
-            actualizarHorariosDisponiblesDesdeBloques(data.bloques);
+            }
         }
+
 
         function actualizarHorariosDisponiblesDesdeBloques(bloques, horaForzada = null) {
             const selectHora = document.getElementById("cita_hora");
