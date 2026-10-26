@@ -22,7 +22,6 @@ try:
         "Ceja",
         "Contornos",
         "Barba",
-        "Barba + ceja",
         "Corte + barba",
         "Corte + barba + ceja",
         "Corte + ceja",
