@@ -626,7 +626,7 @@
             document.getElementById("fecha_hora").value = now.toISOString().slice(0, 16);
         }
 
-                async function cargarDisponibilidadDia() {
+        async function cargarDisponibilidadDia() {
             const inputFecha = document.getElementById("filtro-fecha-citas");
             const fecha = inputFecha.value;
             const contenedor = document.getElementById("contenedor-disponibilidad");
@@ -654,6 +654,14 @@
                     return;
                 }
 
+                // Obtener el catálogo de servicios actual para los selectores del mini-form
+                const resS = await fetch("/servicios-catalogo/");
+                const catalogo = await resS.json();
+                let opcionesServicios = '<option value="">Selecciona servicio</option>';
+                catalogo.forEach(s => {
+                    opcionesServicios += `<option value="${s.id}">${s.nombre_servicio}</option>`;
+                });
+
                 contenedor.innerHTML = "";
                 data.bloques.forEach(bloque => {
                     const hora12 = formatearHora12(bloque.hora);
@@ -661,17 +669,51 @@
                     
                     bloque.espacios.forEach(esp => {
                         if (esp.ocupado) {
+                            const servicioActual = esp.servicio_id || "";
+                            const metodoActual = esp.metodo_pago || "Efectivo";
+                            const precioActual = esp.precio_cobrado || "";
+
                             htmlEspacios += `
-                                <div class="bg-rose-50 border border-rose-200 rounded-lg p-2.5 text-xs flex justify-between items-center">
-                                    <div>
-                                        <span class="font-semibold text-rose-900">🔴 ${esp.barbero_nombre}: ${esp.cliente}</span>
-                                        <div class="text-[10px] text-rose-700">Anticipo: ${esp.anticipo}</div>
-                                        ${esp.precio_cobrado ? `<div class="text-[10px] font-semibold text-emerald-800">Pagado: $${esp.precio_cobrado} (${esp.metodo_pago})</div>` : ''}
+                                <div class="bg-rose-50 border border-rose-200 rounded-lg p-2.5 text-xs flex flex-col gap-2">
+                                    <div class="flex justify-between items-center">
+                                        <div>
+                                            <span class="font-semibold text-rose-900">🔴 ${esp.barbero_nombre}: ${esp.cliente}</span>
+                                            <div class="text-[10px] text-rose-700">Anticipo: ${esp.anticipo}</div>
+                                            ${esp.precio_cobrado ? `<div class="text-[10px] font-semibold text-emerald-800">Pagado: $${esp.precio_cobrado} (${esp.metodo_pago})</div>` : ''}
+                                        </div>
+                                        <div class="flex items-center gap-1.5 flex-wrap justify-end">
+                                            <button onclick="toggleFormularioPagoRapido(${esp.cita_id})" class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-1 rounded font-semibold hover:bg-emerald-200 transition">💵 Registrar Pago</button>
+                                            <button onclick="prepararEdicionCita(${esp.cita_id}, '${fecha}', '${bloque.hora}', '${esp.cliente}', '${esp.anticipo}', ${esp.barbero_id}, ${esp.servicio_id}, '${esp.metodo_pago}', ${esp.precio_cobrado})" class="text-[10px] bg-amber-100 text-amber-800 px-2.5 py-1 rounded font-medium hover:bg-amber-200 transition">Editar</button>
+                                            <button onclick="cancelarCita(${esp.cita_id})" class="text-[10px] bg-rose-100 text-rose-800 px-2.5 py-1 rounded font-medium hover:bg-rose-200 transition">Cancelar</button>
+                                        </div>
                                     </div>
-                                    <div class="flex items-center gap-1.5 flex-wrap justify-end">
-                                        <button onclick="prepararEdicionCita(${esp.cita_id}, '${fecha}', '${bloque.hora}', '${esp.cliente}', '${esp.anticipo}', ${esp.barbero_id}, ${esp.servicio_id}, '${esp.metodo_pago}', ${esp.precio_cobrado})" class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-1 rounded font-semibold hover:bg-emerald-200 transition">💵 Registrar Pago</button>
-                                        <button onclick="prepararEdicionCita(${esp.cita_id}, '${fecha}', '${bloque.hora}', '${esp.cliente}', '${esp.anticipo}', ${esp.barbero_id}, ${esp.servicio_id}, '${esp.metodo_pago}', ${esp.precio_cobrado})" class="text-[10px] bg-amber-100 text-amber-800 px-2.5 py-1 rounded font-medium hover:bg-amber-200 transition">Editar</button>
-                                        <button onclick="cancelarCita(${esp.cita_id})" class="text-[10px] bg-rose-100 text-rose-800 px-2.5 py-1 rounded font-medium hover:bg-rose-200 transition">Cancelar</button>
+
+                                    <!-- Mini-formulario desplegable integrado directamente en la tarjeta -->
+                                    <div id="form-pago-rapido-${esp.cita_id}" class="hidden bg-white p-3 rounded-lg border border-stone-200 space-y-2 mt-1 shadow-inner">
+                                        <p class="font-medium text-stone-900 text-[11px] border-b border-stone-100 pb-1">Cobro Rápido - ${esp.cliente}</p>
+                                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                            <div>
+                                                <label class="block text-[9px] font-medium text-stone-600 uppercase mb-0.5">Servicio</label>
+                                                <select id="quick_servicio_${esp.cita_id}" class="w-full px-2 py-1 rounded border border-stone-300 text-[11px] bg-white">
+                                                    ${opcionesServicios}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-[9px] font-medium text-stone-600 uppercase mb-0.5">Método</label>
+                                                <select id="quick_metodo_${esp.cita_id}" class="w-full px-2 py-1 rounded border border-stone-300 text-[11px] bg-white">
+                                                    <option value="Efectivo" ${metodoActual === 'Efectivo' ? 'selected' : ''}>Efectivo</option>
+                                                    <option value="Tarjeta" ${metodoActual === 'Tarjeta' ? 'selected' : ''}>Tarjeta (4%)</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-[9px] font-medium text-stone-600 uppercase mb-0.5">Precio ($)</label>
+                                                <input type="number" step="0.5" id="quick_precio_${esp.cita_id}" value="${precioActual}" placeholder="Ej. 200" class="w-full px-2 py-1 rounded border border-stone-300 text-[11px]">
+                                            </div>
+                                        </div>
+                                        <div class="flex justify-end gap-1.5 pt-1">
+                                            <button onclick="toggleFormularioPagoRapido(${esp.cita_id})" class="px-2 py-1 bg-stone-200 text-stone-700 rounded text-[10px] hover:bg-stone-300 transition">Cancelar</button>
+                                            <button onclick="guardarPagoRapido(${esp.cita_id}, '${fecha}', '${bloque.hora}', '${esp.cliente}', '${esp.anticipo}', ${esp.barbero_id})" class="px-2.5 py-1 bg-emerald-700 text-white rounded text-[10px] font-semibold hover:bg-emerald-800 transition">Guardar Pago</button>
+                                        </div>
                                     </div>
                                 </div>
                             `;
@@ -711,6 +753,48 @@
             }
         }
 
+        // Funciones auxiliares para el mini-formulario de pago rápido (Limpias y sin duplicados)
+        function toggleFormularioPagoRapido(citaId) {
+            const miniForm = document.getElementById(`form-pago-rapido-${citaId}`);
+            if (miniForm) {
+                miniForm.classList.toggle("hidden");
+            }
+        }
+
+        async function guardarPagoRapido(citaId, fecha, hora, cliente, anticipo, barberoId) {
+            const servicioVal = document.getElementById(`quick_servicio_${citaId}`).value;
+            const metodoVal = document.getElementById(`quick_metodo_${citaId}`).value;
+            const precioVal = document.getElementById(`quick_precio_${citaId}`).value;
+
+            if (!servicioVal || !precioVal) {
+                alert("Por favor selecciona un servicio y escribe el precio cobrado.");
+                return;
+            }
+
+            const data = {
+                cliente_nombre: cliente,
+                fecha: fecha,
+                hora: hora,
+                anticipo: anticipo === 'No' ? '' : anticipo,
+                barbero_id: barberoId,
+                servicio_id: parseInt(servicioVal),
+                metodo_pago: metodoVal,
+                precio_cobrado: parseFloat(precioVal)
+            };
+
+            const res = await fetch(`/citas/${citaId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data)
+            });
+
+            if (res.ok) {
+                cargarDisponibilidadDia();
+                cargarHistorial(); // Actualiza también la pestaña de servicios diarios
+            } else {
+                alert("Error al registrar el pago rápido de la cita.");
+            }
+        }
 
         function actualizarHorariosDisponiblesDesdeBloques(bloques, horaForzada = null) {
             const selectHora = document.getElementById("cita_hora");
