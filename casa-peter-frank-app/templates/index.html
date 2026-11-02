@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Casa Peter Frank - Sistema de Gestión</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Favicon de la aplicación -->
+    <link rel="icon" type="image/jpeg" href="../static/logo.jpeg">
+</head>
+<body class="bg-stone-50 text-stone-800 font-sans antialiased min-h-screen flex flex-col justify-between">
+
+    <!-- Header Fijo -->
+    <header class="bg-white border-b border-stone-200 py-4 px-6 shadow-sm sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <!-- Logo 100% Redondo -->
+                <img src="../static/logo.jpeg" alt="Logo" onerror="this.src='/static/logo.png'" class="w-10 h-10 rounded-full object-cover border border-stone-300 shadow-sm">
+                <h1 class="text-xl font-semibold tracking-wide text-stone-900">Casa Peter Frank</h1>
+            </div>
+            <div class="flex items-center gap-3">
+               <nav class="flex gap-2 bg-stone-100 p-1 rounded-lg">
+                    <button onclick="cambiarVista('citas')" id="btn-citas" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white text-stone-900 shadow-sm transition">Agenda de Citas</button>
+                    <button onclick="cambiarVista('servicios')" id="btn-servicios" class="px-3 py-1.5 text-xs font-medium rounded-md text-stone-600 hover:text-stone-900 transition">Servicios Diarios</button>
+                    <button onclick="cambiarVista('gastos')" id="btn-gastos" class="px-3 py-1.5 text-xs font-medium rounded-md text-stone-600 hover:text-stone-900 transition">Gastos y Balance</button>
+                </nav>
+
+                <a href="/exportar-csv/" class="bg-emerald-700 text-white text-xs font-medium px-3 py-2 rounded-lg hover:bg-emerald-800 transition tracking-wide">
+                    📊 Exportar CSV
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto w-full p-6 my-6">
+        
+        <!-- VISTA 1: SERVICIOS DIARIOS Y REGISTRO -->
+        <div id="vista-servicios" class="hidden grid grid-cols-1 md:grid-cols-3 gap-8">
+            <!-- Formulario de Registro / Edición -->
+            <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-1 h-fit md:sticky md:top-24">
+                <h2 id="titulo-form-servicio" class="text-base font-medium text-stone-900 mb-4">Registrar Servicio</h2>
+                
+                <form id="form-servicio" class="space-y-4">
+                    <input type="hidden" id="edit_servicio_id">
+                    <div>
+                        <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Fecha y Hora</label>
+                        <input type="datetime-local" id="fecha_hora" required class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm bg-white">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Cliente</label>
+                        <input type="text" id="cliente_nombre" required placeholder="Nombre del cliente" class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Barbero</label>
+                        <select id="barbero_id" required class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm bg-white">
+                            <option value="">Cargando...</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Servicio</label>
+                        <select id="servicio_id" required class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm bg-white">
+                            <option value="">Cargando...</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Método de Pago</label>
+                        <select id="metodo_pago" required class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm bg-white">
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Tarjeta">Tarjeta (Comisión 4%)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Precio Cobrado ($)</label>
+                        <input type="number" step="0.5" id="precio_cobrado" required placeholder="Ej. 200" class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm">
+                    </div>
+
+                    <div class="flex gap-2">
+                        <button type="submit" id="btn-submit-servicio" class="flex-1 py-2.5 bg-stone-900 text-white font-medium rounded-lg hover:bg-stone-800 transition text-sm tracking-wide">
+                            Registrar Servicio
+                        </button>
+                        <button type="button" id="btn-cancelar-edicion-servicio" onclick="cancelarEdicionServicio()" class="hidden px-3 py-2.5 bg-stone-200 text-stone-700 font-medium rounded-lg hover:bg-stone-300 transition text-sm">
+                            Cancelar
+                        </button>
+                    </div>
+                </form>
+                <div id="mensaje-alerta" class="mt-4 hidden p-3 rounded-lg text-xs text-center"></div>
+            </section>
+
+            <!-- Historial y Totales -->
+            <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-2 space-y-6">
+                <!-- Panel de Totales Resumen -->
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="bg-stone-50 border border-stone-200 p-3 rounded-xl">
+                        <span class="block text-[10px] uppercase font-semibold text-stone-500">Efectivo</span>
+                        <span id="total-efectivo" class="text-base font-bold text-stone-900">$0.00</span>
+                    </div>
+                    <div class="bg-stone-50 border border-stone-200 p-3 rounded-xl">
+                        <span class="block text-[10px] uppercase font-semibold text-stone-500">Tarjeta (Neto)</span>
+                        <span id="total-tarjeta" class="text-base font-bold text-amber-700">$0.00</span>
+                    </div>
+                    <div class="bg-emerald-50 border border-emerald-200 p-3 rounded-xl">
+                        <span class="block text-[10px] uppercase font-semibold text-emerald-700">Total Neto</span>
+                        <span id="total-neto-general" class="text-base font-bold text-emerald-800">$0.00</span>
+                    </div>
+                </div>
+
+                <!-- Filtros Avanzados -->
+                <div class="flex flex-wrap justify-between items-center gap-2 border-b border-stone-200 pb-4">
+                    <h2 class="text-base font-medium text-stone-900">Historial de Servicios</h2>
+                    <div class="flex flex-wrap gap-2 items-center">
+                        <select id="filtro-tipo" onchange="toggleFiltroCampos()" class="px-2 py-1 text-xs border border-stone-300 rounded-lg bg-white">
+                            <option value="todos">Todo el historial</option>
+                            <option value="dia">Por Día</option>
+                            <option value="semana">Semana Actual</option>
+                            <option value="mes">Por Mes</option>
+                            <option value="anio">Por Año</option>
+                        </select>
+                        <input type="date" id="filtro-input-fecha" class="hidden px-2 py-1 text-xs border border-stone-300 rounded-lg bg-white">
+                        <select id="filtro-mes" class="hidden px-2 py-1 text-xs border border-stone-300 rounded-lg bg-white">
+                            <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+                            <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+                            <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+                            <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+                        </select>
+                        <input type="number" id="filtro-anio" placeholder="Ej. 2026" class="hidden w-20 px-2 py-1 text-xs border border-stone-300 rounded-lg bg-white">
+                        <button onclick="cargarHistorial()" class="px-3 py-1 bg-stone-900 hover:bg-stone-800 text-white text-xs font-medium rounded-lg transition">Aplicar</button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="border-b border-stone-200 text-stone-500 uppercase tracking-wider">
+                                <th class="py-2 px-2">Fecha</th>
+                                <th class="py-2 px-2">Cliente</th>
+                                <th class="py-2 px-2">Barbero</th>
+                                <th class="py-2 px-2">Servicio</th>
+                                <th class="py-2 px-2">Pago</th>
+                                <th class="py-2 px-2 text-right">Neto</th>
+                                <th class="py-2 px-2 text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-historial" class="divide-y divide-stone-100 text-stone-700">
+                            <tr><td colspan="7" class="py-4 text-center text-stone-400">Cargando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- VISTA 2: AGENDA DE CITAS (VISIBLE POR DEFECTO) -->
+        <div id="vista-citas" class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <!-- Formulario Agendar / Editar Cita -->
+            <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-1 h-fit md:sticky md:top-24">
+                <h2 id="titulo-form-cita" class="text-base font-medium text-stone-900 mb-4">Agendar Nueva Cita</h2>
+                
+                <form id="form-cita" class="space-y-4">
+                    <input type="hidden" id="edit_cita_id">
+                    <div>
+                        <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Nombre del Cliente</label>
+                        <input type="text" id="cita_cliente" required placeholder="Nombre completo" class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Día de la Cita</label>
+                        <input type="date" id="cita_fecha" required class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm bg-white" onchange="sincronizarFechaDesdeFormulario(this.value)">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Hora</label>
+                        <select id="cita_hora" required class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm bg-white">
+                            <option value="">Selecciona primero un día</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Barbero (Opcional)</label>
+                        <select id="cita_barbero" class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm bg-white">
+                            <option value="">Cualquiera disponible</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Anticipo (Opcional)</label>
+                        <input type="text" id="cita_anticipo" placeholder="Ej. $100 en efectivo" class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm">
+                    </div>
+
+                    <!-- SECCIÓN OPCIONAL DE PAGO -->
+                    <div class="border-t border-stone-200 pt-3 mt-3">
+                        <button type="button" onclick="toggleSeccionPago()" class="text-xs font-semibold text-emerald-700 hover:text-emerald-900 flex items-center gap-1">
+                            ➕ Registrar pago / completar servicio (Opcional)
+                        </button>
+                        
+                        <div id="seccion-pago" class="hidden space-y-3 mt-3 bg-stone-50 p-3 rounded-xl border border-stone-200">
+                            <div>
+                                <label class="block text-[10px] font-medium text-stone-600 uppercase mb-1">Servicio Realizado</label>
+                                <select id="cita_servicio_id" class="w-full px-2 py-1.5 rounded-lg border border-stone-300 text-xs bg-white">
+                                    <option value="">Selecciona servicio</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-medium text-stone-600 uppercase mb-1">Método de Pago</label>
+                                <select id="cita_metodo_pago" class="w-full px-2 py-1.5 rounded-lg border border-stone-300 text-xs bg-white">
+                                    <option value="Efectivo">Efectivo</option>
+                                    <option value="Tarjeta">Tarjeta (Comisión 4%)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-medium text-stone-600 uppercase mb-1">Precio Cobrado ($)</label>
+                                <input type="number" step="0.5" id="cita_precio_cobrado" placeholder="Ej. 200" class="w-full px-2 py-1.5 rounded-lg border border-stone-300 text-xs">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-2 pt-2">
+                        <button type="submit" id="btn-submit-cita" class="flex-1 py-2.5 bg-stone-900 text-white font-medium rounded-lg hover:bg-stone-800 transition text-sm tracking-wide">
+                            Confirmar Cita
+                        </button>
+                        <button type="button" id="btn-cancelar-edicion-cita" onclick="cancelarEdicionCita()" class="hidden px-3 py-2.5 bg-stone-200 text-stone-700 font-medium rounded-lg hover:bg-stone-300 transition text-sm">
+                            Cancelar
+                        </button>
+                    </div>
+                </form>
+                <div id="cita-alerta" class="mt-4 hidden p-3 rounded-lg text-xs text-center"></div>
+            </section>
+
+            <!-- Visualización de Disponibilidad por Día -->
+            <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-2">
+                <div class="sticky top-20 bg-white/95 backdrop-blur z-20 pb-4 mb-4 border-b border-stone-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <h2 class="text-base font-medium text-stone-900">Disponibilidad de Citas</h2>
+                        <p id="label-fecha-activa" class="text-xs font-semibold text-emerald-700 mt-0.5">Cargando fecha...</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="date" id="filtro-fecha-citas" class="px-3 py-1.5 text-xs border border-stone-300 rounded-lg bg-white font-medium" onchange="sincronizarFechaDesdeAgenda(this.value)">
+                        <button type="button" onclick="irAHoy()" title="Ver hoy" class="px-2.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg text-xs font-medium transition flex items-center gap-1 shadow-sm">
+                            📅 Hoy
+                        </button>
+                        <button type="button" onclick="cargarDisponibilidadDia()" title="Recargar agenda" class="px-2.5 py-1.5 bg-stone-900 hover:bg-stone-800 text-white rounded-lg text-xs font-medium transition flex items-center gap-1 shadow-sm">
+                            🔄
+                        </button>
+                    </div>
+                </div>
+
+                <div id="contenedor-disponibilidad" class="space-y-3">
+                    <p class="text-xs text-stone-400 text-center py-6">Selecciona una fecha para ver los horarios y espacios disponibles.</p>
+                </div>
+            </section>
+        </div>
+
+        <!-- VISTA 3: GASTOS Y BALANCE FINANCIERO -->
+        <div id="vista-gastos" class="hidden grid grid-cols-1 md:grid-cols-3 gap-8">
+            <!-- Formulario de Registro de Gastos -->
+            <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-1 h-fit md:sticky md:top-24">
+                <h2 class="text-base font-medium text-stone-900 mb-4">Registrar Gasto</h2>
+                <form id="form-gasto" class="space-y-4" onsubmit="registrarGasto(event)">
+                    <div>
+                        <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Fecha</label>
+                        <input type="date" id="gasto_fecha" required class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm bg-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Categoría</label>
+                        <select id="gasto_categoria" required class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm bg-white">
+                            <option value="">Selecciona categoría</option>
+                            <option value="Personal">Personal</option>
+                            <option value="Renta">Renta</option>
+                            <option value="Luz">Luz</option>
+                            <option value="Agua">Agua</option>
+                            <option value="Internet">Internet</option>
+                            <option value="Insumos">Insumos</option>
+                            <option value="Recolección">Recolección</option>
+                            <option value="Impuestos">Impuestos</option>
+                            <option value="Contadora">Contadora</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Monto ($)</label>
+                        <input type="number" step="0.5" id="gasto_monto" required placeholder="Ej. 1500" class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-stone-600 uppercase mb-1">Descripción (Opcional)</label>
+                        <input type="text" id="gasto_descripcion" placeholder="Detalle del gasto" class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm">
+                    </div>
+                    <button type="submit" class="w-full py-2.5 bg-stone-900 text-white font-medium rounded-lg hover:bg-stone-800 transition text-sm">
+                        Guardar Gasto
+                    </button>
+                </form>
+            </section>
+
+            <!-- Historial y Balance -->
+            <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-2 space-y-6">
+                <!-- Panel Financiero Resumen -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="bg-stone-50 border border-stone-200 p-3 rounded-xl">
+                        <span class="block text-[10px] uppercase font-semibold text-stone-500">Ingresos Totales</span>
+                        <span id="bal-ingresos" class="text-base font-bold text-stone-900">$0.00</span>
+                    </div>
+                    <div class="bg-rose-50 border border-rose-200 p-3 rounded-xl">
+                        <span class="block text-[10px] uppercase font-semibold text-rose-700">Gastos Totales</span>
+                        <span id="bal-gastos" class="text-base font-bold text-rose-800">$0.00</span>
+                    </div>
+                    <div class="bg-emerald-50 border border-emerald-200 p-3 rounded-xl">
+                        <span class="block text-[10px] uppercase font-semibold text-emerald-700">Ganancia Neta Final</span>
+                        <span id="bal-neto" class="text-base font-bold text-emerald-800">$0.00</span>
+                    </div>
+                </div>
+
+                <!-- Tabla y Filtros -->
+                <div class="flex justify-between items-center border-b border-stone-200 pb-4">
+                    <h2 class="text-base font-medium text-stone-900">Historial de Gastos</h2>
+                    <div class="flex gap-2 items-center">
+                        <select id="filtro-gasto-tipo" onchange="cargarGastos()" class="px-2 py-1 text-xs border border-stone-300 rounded-lg bg-white">
+                            <option value="todos">Todo el historial</option>
+                            <option value="dia">Por Día</option>
+                            <option value="mes">Por Mes</option>
+                            <option value="anio">Por Año</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="border-b border-stone-200 text-stone-500 uppercase tracking-wider">
+                                <th class="py-2 px-2">Fecha</th>
+                                <th class="py-2 px-2">Categoría</th>
+                                <th class="py-2 px-2">Descripción</th>
+                                <th class="py-2 px-2 text-right">Monto</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-gastos" class="divide-y divide-stone-100 text-stone-700">
+                            <tr><td colspan="4" class="py-4 text-center text-stone-400">No hay gastos registrados.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+    </main>
+
+    <footer class="text-center py-4 text-xs text-stone-400">
+        Casa Peter Frank &copy; 2026 - Sistema de Gestión Interna
+    </footer>
+
+    <script>
+        function obtenerFechaLocal(date = new Date()) {
+            const offset = date.getTimezoneOffset();
+            const localDate = new Date(date.getTime() - (offset * 60 * 1000));
+            return localDate.toISOString().split('T')[0];
+        }
+
+        function formatearFechaHoraLocal(date = new Date()) {
+            const offset = date.getTimezoneOffset();
+            const localDate = new Date(date.getTime() - (offset * 60 * 1000));
+            return localDate.toISOString().slice(0, 16);
+        }
+
+        function formatearHora12(hora24) {
+            if (!hora24) return "";
+            const [h, m] = hora24.split(":");
+            let horas = parseInt(h, 10);
+            const ampm = horas >= 12 ? 'PM' : 'AM';
+            horas = horas % 12;
+            horas = horas ? horas : 12;
+            return `${horas}:${m} ${ampm}`;
+        }
+
+        // Sincronización bidireccional inmediata entre formulario y agenda
+        function sincronizarFechaDesdeFormulario(fecha) {
+            if (!fecha) return;
+            document.getElementById("filtro-fecha-citas").value = fecha;
+            cargarDisponibilidadDia();
+        }
+
+        function sincronizarFechaDesdeAgenda(fecha) {
+            if (!fecha) return;
+            document.getElementById("cita_fecha").value = fecha;
+            cargarDisponibilidadDia();
+        }
+
+        function irAHoy() {
+            const hoy = obtenerFechaLocal(new Date());
+            document.getElementById("filtro-fecha-citas").value = hoy;
+            document.getElementById("cita_fecha").value = hoy;
+            cargarDisponibilidadDia();
+        }
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            const now = new Date();
+            document.getElementById("fecha_hora").value = formatearFechaHoraLocal(now);
+            
+            const hoyFecha = obtenerFechaLocal(now);
+            document.getElementById("cita_fecha").value = hoyFecha;
+            document.getElementById("filtro-fecha-citas").value = hoyFecha;
+            document.getElementById("filtro-input-fecha").value = hoyFecha;
+            document.getElementById("filtro-mes").value = now.getMonth() + 1;
+            document.getElementById("filtro-anio").value = now.getFullYear();
+
+            await cargarSelects();
+            await cargarHistorial();
+            await cargarDisponibilidadDia();
+
+            // Formulario Servicio
+            document.getElementById("form-servicio").addEventListener("submit", async (e) => {
+                e.preventDefault();
+                const editId = document.getElementById("edit_servicio_id").value;
+                const barberoVal = document.getElementById("barbero_id").value;
+                const servicioVal = document.getElementById("servicio_id").value;
+                const precioVal = document.getElementById("precio_cobrado").value;
+                const alerta = document.getElementById("mensaje-alerta");
+
+                if (!barberoVal) {
+                    alerta.textContent = "Por favor selecciona un barbero.";
+                    alerta.className = "mt-4 p-3 rounded-lg text-xs text-center bg-rose-50 text-rose-800 border border-rose-200 block";
+                    return;
+                }
+                if (!servicioVal) {
+                    alerta.textContent = "Por favor selecciona un servicio.";
+                    alerta.className = "mt-4 p-3 rounded-lg text-xs text-center bg-rose-50 text-rose-800 border border-rose-200 block";
+                    return;
+                }
+                if (!precioVal || isNaN(parseFloat(precioVal))) {
+                    alerta.textContent = "Por favor ingresa un precio válido.";
+                    alerta.className = "mt-4 p-3 rounded-lg text-xs text-center bg-rose-50 text-rose-800 border border-rose-200 block";
+                    return;
+                }
+
+                const data = {
+                    cliente_nombre: document.getElementById("cliente_nombre").value,
+                    servicio_id: parseInt(servicioVal, 10),
+                    barbero_id: parseInt(barberoVal, 10),
+                    metodo_pago: document.getElementById("metodo_pago").value,
+                    precio_cobrado: parseFloat(precioVal),
+                    fecha_hora: new Date(document.getElementById("fecha_hora").value).toISOString()
+                };
+
+                const url = editId ? `/servicios-diarios/${editId}` : "/servicios-diarios/";
+                const method = editId ? "PUT" : "POST";
+
+                try {
+                    const res = await fetch(url, {
+                        method: method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(data)
+                    });
+                    const result = await res.json().catch(() => ({}));
+                    if (res.ok) {
+                        alerta.textContent = editId ? "¡Registro actualizado con éxito!" : `¡Registrado! Neto: $${result.total_cobrado_neto}`;
+                        alerta.className = "mt-4 p-3 rounded-lg text-xs text-center bg-emerald-50 text-emerald-800 border border-emerald-200 block";
+                        cancelarEdicionServicio();
+                        cargarHistorial();
+                    } else {
+                        alerta.textContent = result.detail || result.error || "Error al guardar el registro";
+                        alerta.className = "mt-4 p-3 rounded-lg text-xs text-center bg-rose-50 text-rose-800 border border-rose-200 block";
+                    }
+                } catch (err) {
+                    alerta.textContent = "Error de conexión al guardar el registro";
+                    alerta.className = "mt-4 p-3 rounded-lg text-xs text-center bg-rose-50 text-rose-800 border border-rose-200 block";
+                }
+            });
+
+            // Formulario Cita
+            document.getElementById("form-cita").addEventListener("submit", async (e) => {
+                e.preventDefault();
+                const editId = document.getElementById("edit_cita_id").value;
+                const barberoVal = document.getElementById("cita_barbero").value;
+                const servicioVal = document.getElementById("cita_servicio_id").value;
+                const precioVal = document.getElementById("cita_precio_cobrado").value;
+                const metodoVal = document.getElementById("cita_metodo_pago").value || "Efectivo";
+
+                const data = {
+                    cliente_nombre: document.getElementById("cita_cliente").value,
+                    fecha: document.getElementById("cita_fecha").value,
+                    hora: document.getElementById("cita_hora").value,
+                    anticipo: document.getElementById("cita_anticipo").value || "No",
+                    barbero_id: barberoVal ? parseInt(barberoVal, 10) : null,
+                    servicio_id: servicioVal ? parseInt(servicioVal, 10) : null,
+                    metodo_pago: (servicioVal || precioVal) ? metodoVal : null,
+                    precio_cobrado: precioVal ? parseFloat(precioVal) : null
+                };
+
+                const url = editId ? `/citas/${editId}` : "/citas/";
+                const method = editId ? "PUT" : "POST";
+
+                try {
+                    const res = await fetch(url, {
+                        method: method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(data)
+                    });
+                    const result = await res.json().catch(() => ({}));
+                    const alerta = document.getElementById("cita-alerta");
+                    if (res.ok) {
+                        alerta.textContent = editId ? "¡Cita actualizada con éxito!" : "¡Cita agendada y registrada con éxito!";
+                        alerta.className = "mt-4 p-3 rounded-lg text-xs text-center bg-emerald-50 text-emerald-800 border border-emerald-200 block";
+                        
+                        const fechaActualSeleccionada = document.getElementById("cita_fecha").value;
+                        document.getElementById("filtro-fecha-citas").value = fechaActualSeleccionada;
+                        
+                        cancelarEdicionCita();
+                        cargarDisponibilidadDia();
+                        cargarHistorial(); 
+                    } else {
+                        alerta.textContent = result.detail || result.error || "Error al procesar cita";
+                        alerta.className = "mt-4 p-3 rounded-lg text-xs text-center bg-rose-50 text-rose-800 border border-rose-200 block";
+                    }
+                } catch (err) {
+                    const alerta = document.getElementById("cita-alerta");
+                    alerta.textContent = "Error de conexión con el servidor";
+                    alerta.className = "mt-4 p-3 rounded-lg text-xs text-center bg-rose-50 text-rose-800 border border-rose-200 block";
+                }
+            });
+        });
+
+        function toggleSeccionPago() {
+            const seccion = document.getElementById("seccion-pago");
+            seccion.classList.toggle("hidden");
+        }
+
+        function toggleFiltroCampos() {
+            const tipo = document.getElementById("filtro-tipo").value;
+            const inputFecha = document.getElementById("filtro-input-fecha");
+            const selectMes = document.getElementById("filtro-mes");
+            const inputAnio = document.getElementById("filtro-anio");
+
+            inputFecha.classList.add("hidden");
+            selectMes.classList.add("hidden");
+            inputAnio.classList.add("hidden");
+
+            if (tipo === "dia") {
+                inputFecha.classList.remove("hidden");
+            } else if (tipo === "mes") {
+                selectMes.classList.remove("hidden");
+                inputAnio.classList.remove("hidden");
+            } else if (tipo === "anio") {
+                inputAnio.classList.remove("hidden");
+            }
+        }
+
+        // Función de navegación de pestañas única y blindada
+        function cambiarVista(vista) {
+            const vServicios = document.getElementById("vista-servicios");
+            const vCitas = document.getElementById("vista-citas");
+            const vGastos = document.getElementById("vista-gastos");
+            const btnS = document.getElementById("btn-servicios");
+            const btnC = document.getElementById("btn-citas");
+            const btnG = document.getElementById("btn-gastos");
+
+            if (vServicios) vServicios.classList.add('hidden');
+            if (vCitas) vCitas.classList.add('hidden');
+            if (vGastos) vGastos.classList.add('hidden');
+            
+            if (btnS) btnS.className = "px-3 py-1.5 text-xs font-medium rounded-md text-stone-600 hover:text-stone-900 transition";
+            if (btnC) btnC.className = "px-3 py-1.5 text-xs font-medium rounded-md text-stone-600 hover:text-stone-900 transition";
+            if (btnG) btnG.className = "px-3 py-1.5 text-xs font-medium rounded-md text-stone-600 hover:text-stone-900 transition";
+
+            if (vista === 'servicios' && vServicios) {
+                vServicios.classList.remove('hidden');
+                if (btnS) btnS.className = "px-3 py-1.5 text-xs font-medium rounded-md bg-white text-stone-900 shadow-sm transition";
+            } else if (vista === 'citas' && vCitas) {
+                vCitas.classList.remove('hidden');
+                if (btnC) btnC.className = "px-3 py-1.5 text-xs font-medium rounded-md bg-white text-stone-900 shadow-sm transition";
+                if (typeof cargarDisponibilidadDia === 'function') cargarDisponibilidadDia();
+            } else if (vista === 'gastos' && vGastos) {
+                vGastos.classList.remove('hidden');
+                if (btnG) btnG.className = "px-3 py-1.5 text-xs font-medium rounded-md bg-white text-stone-900 shadow-sm transition";
+                const inputFechaGasto = document.getElementById("gasto_fecha");
+                if (inputFechaGasto) inputFechaGasto.value = obtenerFechaLocal();
+                if (typeof cargarGastos === 'function') cargarGastos();
+            }
+        }
+
+        async function cargarSelects() {
+            try {
+                const resB = await fetch("/barberos/");
+                const barberos = await resB.json();
+                
+                const bServicio = document.getElementById("barbero_id");
+                bServicio.innerHTML = '<option value="">Selecciona barbero</option>';
+                barberos.forEach(b => bServicio.innerHTML += `<option value="${b.id}">${b.nombre}</option>`);
+
+                const bCita = document.getElementById("cita_barbero");
+                bCita.innerHTML = '<option value="">Cualquiera disponible</option>';
+                barberos.forEach(b => bCita.innerHTML += `<option value="${b.id}">${b.nombre}</option>`);
+
+                const resS = await fetch("/servicios-catalogo/");
+                window.catalogoServiciosCache = await resS.json();
+                
+                const sSelect = document.getElementById("servicio_id");
+                sSelect.innerHTML = '<option value="">Selecciona servicio</option>';
+                window.catalogoServiciosCache.forEach(s => sSelect.innerHTML += `<option value="${s.id}">${s.nombre_servicio}</option>`);
+
+                const sCitaSelect = document.getElementById("cita_servicio_id");
+                sCitaSelect.innerHTML = '<option value="">Selecciona servicio</option>';
+                window.catalogoServiciosCache.forEach(s => sCitaSelect.innerHTML += `<option value="${s.id}">${s.nombre_servicio}</option>`);
+            } catch (err) {
+                console.error("Error al cargar catalogos iniciales:", err);
+            }
+        }
+
+        async function cargarHistorial() {
+            const tipo = document.getElementById("filtro-tipo").value;
+            let url = "/servicios-diarios/?";
+
+            if (tipo === "dia") {
+                const fecha = document.getElementById("filtro-input-fecha").value;
+                url += `filtro_tipo=dia&fecha_ref=${fecha}`;
+            } else if (tipo === "semana") {
+                url += `filtro_tipo=semana`;
+            } else if (tipo === "mes") {
+                const mes = document.getElementById("filtro-mes").value;
+                const anio = document.getElementById("filtro-anio").value;
+                url += `filtro_tipo=mes&mes=${mes}&anio=${anio}`;
+            } else if (tipo === "anio") {
+                const anio = document.getElementById("filtro-anio").value;
+                url += `filtro_tipo=anio&anio=${anio}`;
+            }
+
+            const res = await fetch(url);
+            window.listaServicios = await res.json();
+            const tbody = document.getElementById("tabla-historial");
+            
+            let totalEfectivo = 0;
+            let totalTarjeta = 0;
+            let totalNetoGeneral = 0;
+
+            if (window.listaServicios.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="py-4 text-center text-stone-400">No hay registros para este filtro.</td></tr>`;
+                document.getElementById("total-efectivo").textContent = "$0.00";
+                document.getElementById("total-tarjeta").textContent = "$0.00";
+                document.getElementById("total-neto-general").textContent = "$0.00";
+                return;
+            }
+
+            tbody.innerHTML = "";
+            window.listaServicios.forEach(r => {
+                if (r.metodo_pago.toLowerCase() === 'efectivo') {
+                    totalEfectivo += r.total_cobrado_neto;
+                } else if (r.metodo_pago.toLowerCase() === 'tarjeta') {
+                    totalTarjeta += r.total_cobrado_neto;
+                }
+                totalNetoGeneral += r.total_cobrado_neto;
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-stone-50 transition">
+                        <td class="py-2.5 px-2">${r.fecha_hora}</td>
+                        <td class="py-2.5 px-2 font-medium">${r.cliente_nombre}</td>
+                        <td class="py-2.5 px-2">${r.barbero}</td>
+                        <td class="py-2.5 px-2">${r.servicio}</td>
+                        <td class="py-2.5 px-2"><span class="px-2 py-0.5 rounded text-[10px] ${r.metodo_pago === 'Tarjeta' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-stone-100 text-stone-700'}">${r.metodo_pago}</span></td>
+                        <td class="py-2.5 px-2 text-right font-semibold text-emerald-700">$${r.total_cobrado_neto.toFixed(2)}</td>
+                        <td class="py-2.5 px-2 text-center">
+                            <button onclick="prepararEdicionServicio(${r.id})" class="text-xs text-amber-600 hover:text-amber-800 font-medium">Editar</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            document.getElementById("total-efectivo").textContent = `$${totalEfectivo.toFixed(2)}`;
+            document.getElementById("total-tarjeta").textContent = `$${totalTarjeta.toFixed(2)}`;
+            document.getElementById("total-neto-general").textContent = `$${totalNetoGeneral.toFixed(2)}`;
+        }
+
+        function prepararEdicionServicio(id) {
+            const item = window.listaServicios.find(s => s.id === id);
+            if (!item) return;
+
+            document.getElementById("edit_servicio_id").value = item.id;
+            document.getElementById("cliente_nombre").value = item.cliente_nombre;
+            document.getElementById("barbero_id").value = item.barbero_id;
+            document.getElementById("servicio_id").value = item.servicio_id;
+            document.getElementById("metodo_pago").value = item.metodo_pago;
+            document.getElementById("precio_cobrado").value = item.precio_cobrado;
+            document.getElementById("fecha_hora").value = item.fecha_hora.replace(" ", "T");
+
+            document.getElementById("titulo-form-servicio").textContent = "Editar Servicio";
+            document.getElementById("btn-submit-servicio").textContent = "Actualizar Registro";
+            document.getElementById("btn-cancelar-edicion-servicio").classList.remove("hidden");
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function cancelarEdicionServicio() {
+            document.getElementById("form-servicio").reset();
+            document.getElementById("edit_servicio_id").value = "";
+            document.getElementById("titulo-form-servicio").textContent = "Registrar Servicio";
+            document.getElementById("btn-submit-servicio").textContent = "Registrar Servicio";
+            document.getElementById("btn-cancelar-edicion-servicio").classList.add("hidden");
+            
+            document.getElementById("fecha_hora").value = formatearFechaHoraLocal(new Date());
+        }
+
+        async function cargarDisponibilidadDia() {
+            const inputFecha = document.getElementById("filtro-fecha-citas");
+            const fecha = inputFecha.value;
+            const contenedor = document.getElementById("contenedor-disponibilidad");
+            const labelActiva = document.getElementById("label-fecha-activa");
+
+            if (!fecha) return;
+
+            contenedor.innerHTML = `<p class="text-xs text-stone-400 text-center py-6">Actualizando disponibilidad...</p>`;
+            
+            try {
+                const [anio, mes, dia] = fecha.split("-");
+                const fechaObj = new Date(anio, mes - 1, dia);
+                const opcionesFecha = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                labelActiva.textContent = `📅 Mostrando agenda para: ${fechaObj.toLocaleDateString('es-ES', opcionesFecha)}`;
+
+                const fechaFormateadaCorta = `${dia}/${mes}/${anio}`;
+
+                const res = await fetch(`/citas-disponibilidad/?fecha=${fecha}`);
+                if (!res.ok) throw new Error("Error en la respuesta del servidor");
+                
+                const data = await res.json();
+
+                if (data.mensaje) {
+                    contenedor.innerHTML = `<p class="text-xs text-rose-600 text-center py-6 font-medium">${data.mensaje}</p>`;
+                    return;
+                }
+
+                // Usar catálogo en memoria o descargarlo si aún no existe
+                if (!window.catalogoServiciosCache) {
+                    const resS = await fetch("/servicios-catalogo/");
+                    window.catalogoServiciosCache = await resS.json();
+                }
+
+                let opcionesServicios = '<option value="">Selecciona servicio</option>';
+                window.catalogoServiciosCache.forEach(s => {
+                    opcionesServicios += `<option value="${s.id}">${s.nombre_servicio}</option>`;
+                });
+
+                window.citasActuales = {};
+                const bloquesHtml = [];
+
+                data.bloques.forEach(bloque => {
+                    const hora12 = formatearHora12(bloque.hora);
+                    let htmlEspacios = "";
+                    
+                    bloque.espacios.forEach(esp => {
+                        if (esp.ocupado) {
+                            window.citasActuales[esp.cita_id] = {
+                                id: esp.cita_id,
+                                fecha: fecha,
+                                hora: bloque.hora,
+                                cliente: esp.cliente,
+                                anticipo: esp.anticipo,
+                                barbero_id: esp.barbero_id,
+                                barbero_nombre: esp.barbero_nombre,
+                                servicio_id: esp.servicio_id,
+                                metodo_pago: esp.metodo_pago,
+                                precio_cobrado: esp.precio_cobrado
+                            };
+
+                            const servicioActual = esp.servicio_id || "";
+                            const metodoActual = esp.metodo_pago || "Efectivo";
+                            const precioActual = (esp.precio_cobrado !== null && esp.precio_cobrado !== undefined) ? esp.precio_cobrado : "";
+
+                            htmlEspacios += `
+                                <div class="bg-rose-50 border border-rose-200 rounded-lg p-2.5 text-xs flex flex-col gap-2">
+                                    <div class="flex justify-between items-center">
+                                        <div>
+                                            <span class="font-semibold text-rose-900">🔴 ${esp.barbero_nombre}: ${esp.cliente}</span>
+                                            <div class="text-[10px] text-rose-700">Anticipo: ${(esp.anticipo && esp.anticipo !== 'null' && esp.anticipo !== 'No') ? esp.anticipo : 'No'}</div>
+                                            ${esp.precio_cobrado ? `<div class="text-[10px] font-semibold text-emerald-800">Pagado: $${esp.precio_cobrado} (${esp.metodo_pago || 'Efectivo'})</div>` : ''}
+                                        </div>
+                                        <div class="flex items-center gap-1.5 flex-wrap justify-end">
+                                            <button type="button" onclick="toggleFormularioPagoRapido(${esp.cita_id})" class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-1 rounded font-semibold hover:bg-emerald-200 transition">💵 Registrar Pago</button>
+                                            <button type="button" onclick="iniciarEdicionCita(${esp.cita_id})" class="text-[10px] bg-amber-100 text-amber-800 px-2.5 py-1 rounded font-medium hover:bg-amber-200 transition">Editar</button>
+                                            <button type="button" onclick="cancelarCita(${esp.cita_id})" class="text-[10px] bg-rose-100 text-rose-800 px-2.5 py-1 rounded font-medium hover:bg-rose-200 transition">Cancelar</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Mini-formulario desplegable integrado directamente en la tarjeta -->
+                                    <div id="form-pago-rapido-${esp.cita_id}" class="hidden bg-white p-3 rounded-lg border border-stone-200 space-y-2 mt-1 shadow-inner">
+                                        <p class="font-medium text-stone-900 text-[11px] border-b border-stone-100 pb-1">Cobro Rápido - ${esp.cliente}</p>
+                                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                            <div>
+                                                <label class="block text-[9px] font-medium text-stone-600 uppercase mb-0.5">Servicio</label>
+                                                <select id="quick_servicio_${esp.cita_id}" class="w-full px-2 py-1 rounded border border-stone-300 text-[11px] bg-white">
+                                                    ${opcionesServicios}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-[9px] font-medium text-stone-600 uppercase mb-0.5">Método</label>
+                                                <select id="quick_metodo_${esp.cita_id}" class="w-full px-2 py-1 rounded border border-stone-300 text-[11px] bg-white">
+                                                    <option value="Efectivo" ${metodoActual === 'Efectivo' ? 'selected' : ''}>Efectivo</option>
+                                                    <option value="Tarjeta" ${metodoActual === 'Tarjeta' ? 'selected' : ''}>Tarjeta (4%)</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-[9px] font-medium text-stone-600 uppercase mb-0.5">Precio ($)</label>
+                                                <input type="number" step="0.5" id="quick_precio_${esp.cita_id}" value="${precioActual}" placeholder="Ej. 200" class="w-full px-2 py-1 rounded border border-stone-300 text-[11px]">
+                                            </div>
+                                        </div>
+                                        <div class="flex justify-end gap-1.5 pt-1">
+                                            <button type="button" onclick="toggleFormularioPagoRapido(${esp.cita_id})" class="px-2 py-1 bg-stone-200 text-stone-700 rounded text-[10px] hover:bg-stone-300 transition">Cancelar</button>
+                                            <button type="button" onclick="guardarPagoRapido(${esp.cita_id})" class="px-2.5 py-1 bg-emerald-700 text-white rounded text-[10px] font-semibold hover:bg-emerald-800 transition">Guardar Pago</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            htmlEspacios += `
+                                <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 text-xs flex justify-between items-center">
+                                    <span class="font-semibold text-emerald-900">🟢 ${esp.barbero_nombre}: Libre</span>
+                                    <button type="button" onclick="seleccionarHora('${bloque.hora}', ${esp.barbero_id})" class="bg-emerald-700 text-white text-[10px] px-2.5 py-1 rounded-md hover:bg-emerald-800 transition">Agendar aquí</button>
+                                </div>
+                            `;
+                        }
+                    });
+
+                    bloquesHtml.push(`
+                        <div class="border border-stone-200 rounded-xl p-3 bg-stone-50/50">
+                            <div class="font-semibold text-xs text-stone-900 mb-2 flex justify-between items-center">
+                                <span class="flex items-center gap-1.5">⏰ ${hora12}</span>
+                                <span class="bg-stone-200/80 text-stone-700 px-2 py-0.5 rounded text-[10px] font-mono tracking-wider">📅 Fecha: ${fechaFormateadaCorta}</span>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                ${htmlEspacios}
+                            </div>
+                        </div>
+                    `);
+                });
+
+                contenedor.innerHTML = bloquesHtml.join("");
+
+                // Asignar el servicio en mini-formularios si ya tenían uno seleccionado
+                Object.values(window.citasActuales).forEach(c => {
+                    if (c.servicio_id) {
+                        const sel = document.getElementById(`quick_servicio_${c.id}`);
+                        if (sel) sel.value = c.servicio_id;
+                    }
+                });
+
+                actualizarHorariosDisponiblesDesdeBloques(data.bloques);
+
+            } catch (error) {
+                console.error("Error al cargar disponibilidad:", error);
+                contenedor.innerHTML = `
+                    <div class="text-center py-6 space-y-2">
+                        <p class="text-xs text-rose-600 font-medium">No se pudo cargar la disponibilidad en este momento.</p>
+                        <button type="button" onclick="cargarDisponibilidadDia()" class="px-3 py-1 bg-stone-900 text-white text-xs rounded-lg hover:bg-stone-800 transition">Reintentar</button>
+                    </div>
+                `;
+            }
+        }
+
+        function toggleFormularioPagoRapido(citaId) {
+            const miniForm = document.getElementById(`form-pago-rapido-${citaId}`);
+            if (miniForm) {
+                miniForm.classList.toggle("hidden");
+            }
+        }
+
+        function iniciarEdicionCita(citaId) {
+            const c = window.citasActuales && window.citasActuales[citaId];
+            if (!c) return;
+            prepararEdicionCita(
+                c.id,
+                c.fecha,
+                c.hora,
+                c.cliente,
+                c.anticipo,
+                c.barbero_id,
+                c.servicio_id,
+                c.metodo_pago,
+                c.precio_cobrado
+            );
+        }
+
+        async function guardarPagoRapido(citaId) {
+            const c = window.citasActuales && window.citasActuales[citaId];
+            if (!c) {
+                alert("No se encontró la información de la cita para registrar el pago.");
+                return;
+            }
+
+            const servicioVal = document.getElementById(`quick_servicio_${citaId}`).value;
+            const metodoVal = document.getElementById(`quick_metodo_${citaId}`).value || "Efectivo";
+            const precioVal = document.getElementById(`quick_precio_${citaId}`).value;
+
+            if (!servicioVal) {
+                alert("Por favor selecciona un servicio.");
+                return;
+            }
+            if (!precioVal || isNaN(parseFloat(precioVal)) || parseFloat(precioVal) <= 0) {
+                alert("Por favor ingresa un precio cobrado válido mayor a cero.");
+                return;
+            }
+
+            const data = {
+                cliente_nombre: c.cliente,
+                fecha: c.fecha,
+                hora: c.hora,
+                anticipo: (c.anticipo && c.anticipo !== 'null' && c.anticipo !== 'No') ? c.anticipo : 'No',
+                barbero_id: c.barbero_id || null,
+                servicio_id: parseInt(servicioVal, 10),
+                metodo_pago: metodoVal,
+                precio_cobrado: parseFloat(precioVal)
+            };
+
+            try {
+                const res = await fetch(`/citas/${citaId}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data)
+                });
+
+                if (res.ok) {
+                    cargarDisponibilidadDia();
+                    cargarHistorial();
+                } else {
+                    const errData = await res.json().catch(() => ({}));
+                    const msg = errData.detail || errData.error || "Error al registrar el pago de la cita.";
+                    alert(msg);
+                }
+            } catch (err) {
+                console.error("Error al registrar pago rápido:", err);
+                alert("Error de conexión al registrar el pago rápido.");
+            }
+        }
+
+        function actualizarHorariosDisponiblesDesdeBloques(bloques, horaForzada = null) {
+            const selectHora = document.getElementById("cita_hora");
+            const horaActualSeleccionada = horaForzada || selectHora.value;
+            selectHora.innerHTML = '<option value="">Selecciona una hora</option>';
+            
+            let horaIncluida = false;
+
+            bloques.forEach(b => {
+                const libres = b.espacios.filter(e => !e.ocupado).length;
+                const esLaHoraActual = (b.hora === horaActualSeleccionada);
+                
+                if (libres > 0 || esLaHoraActual) {
+                    const hora12 = formatearHora12(b.hora);
+                    const etiquetaLibres = esLaHoraActual ? ' (Hora actual de la cita)' : ` (${libres} espacio${libres > 1 ? 's' : ''} libre${libres > 1 ? 's' : ''})`;
+                    selectHora.innerHTML += `<option value="${b.hora}">${hora12}${etiquetaLibres}</option>`;
+                    if (esLaHoraActual) horaIncluida = true;
+                }
+            });
+
+            if (horaForzada && !horaIncluida) {
+                const hora12 = formatearHora12(horaForzada);
+                selectHora.innerHTML += `<option value="${horaForzada}">${hora12} (Hora actual de la cita)</option>`;
+            }
+
+            if (horaActualSeleccionada) {
+                selectHora.value = horaActualSeleccionada;
+            }
+        }
+
+        async function actualizarHorariosDisponibles(horaForzada = null) {
+            const fecha = document.getElementById("cita_fecha").value;
+            if (!fecha) return;
+            try {
+                const res = await fetch(`/citas-disponibilidad/?fecha=${fecha}`);
+                const data = await res.json();
+                if (data.bloques) {
+                    actualizarHorariosDisponiblesDesdeBloques(data.bloques, horaForzada);
+                }
+            } catch (err) {
+                console.error("Error al actualizar horarios disponibles:", err);
+            }
+        }
+
+        function seleccionarHora(hora, barberoId) {
+            cambiarVista('citas');
+            const fechaActiva = document.getElementById("filtro-fecha-citas").value;
+            document.getElementById("cita_fecha").value = fechaActiva;
+            actualizarHorariosDisponibles().then(() => {
+                document.getElementById("cita_hora").value = hora;
+                if (barberoId) document.getElementById("cita_barbero").value = barberoId;
+                document.getElementById("cita_cliente").focus();
+            });
+        }
+
+        function prepararEdicionCita(citaId, fecha, hora, cliente, anticipo, barberoId, servicioId, metodoPago, precioCobrado) {
+            cambiarVista('citas');
+            document.getElementById("edit_cita_id").value = citaId;
+            document.getElementById("cita_cliente").value = cliente || "";
+            document.getElementById("cita_fecha").value = fecha;
+            document.getElementById("filtro-fecha-citas").value = fecha;
+            document.getElementById("cita_anticipo").value = (anticipo && anticipo !== 'null' && anticipo !== 'No') ? anticipo : '';
+            
+            if (barberoId && barberoId !== 'null' && barberoId !== 'undefined') {
+                document.getElementById("cita_barbero").value = barberoId;
+            }
+
+            document.getElementById("seccion-pago").classList.remove("hidden");
+
+            if (servicioId && servicioId !== 'null' && servicioId !== 'undefined') {
+                document.getElementById("cita_servicio_id").value = servicioId;
+            } else {
+                document.getElementById("cita_servicio_id").value = "";
+            }
+
+            if (metodoPago && metodoPago !== 'null' && metodoPago !== 'undefined') {
+                document.getElementById("cita_metodo_pago").value = metodoPago;
+            } else {
+                document.getElementById("cita_metodo_pago").value = "Efectivo";
+            }
+
+            if (precioCobrado !== null && precioCobrado !== undefined && precioCobrado !== 'null' && precioCobrado !== 'undefined' && precioCobrado !== '') {
+                document.getElementById("cita_precio_cobrado").value = precioCobrado;
+            } else {
+                document.getElementById("cita_precio_cobrado").value = "";
+            }
+
+            actualizarHorariosDisponibles(hora).then(() => {
+                document.getElementById("cita_hora").value = hora;
+            });
+
+            document.getElementById("titulo-form-cita").textContent = "Editar Cita / Registrar Pago";
+            document.getElementById("btn-submit-cita").textContent = "Actualizar Cita";
+            document.getElementById("btn-cancelar-edicion-cita").classList.remove("hidden");
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function cancelarEdicionCita() {
+            const fechaActualSeleccionada = document.getElementById("filtro-fecha-citas").value || obtenerFechaLocal(new Date());
+            document.getElementById("form-cita").reset();
+            document.getElementById("edit_cita_id").value = "";
+            document.getElementById("titulo-form-cita").textContent = "Agendar Nueva Cita";
+            document.getElementById("btn-submit-cita").textContent = "Confirmar Cita";
+            document.getElementById("btn-cancelar-edicion-cita").classList.add("hidden");
+            document.getElementById("seccion-pago").classList.add("hidden");
+            
+            document.getElementById("cita_fecha").value = fechaActualSeleccionada;
+            document.getElementById("filtro-fecha-citas").value = fechaActualSeleccionada;
+            actualizarHorariosDisponibles();
+        }
+
+        async function cancelarCita(id) {
+            if (!confirm("¿Estás seguro de cancelar esta cita?")) return;
+            const res = await fetch(`/citas/${id}`, { method: "DELETE" });
+            if (res.ok) {
+                cargarDisponibilidadDia();
+            } else {
+                alert("Error al cancelar la cita");
+            }
+        }
+
+        async function registrarGasto(e) {
+            e.preventDefault();
+            const data = {
+                fecha: document.getElementById("gasto_fecha").value,
+                categoria: document.getElementById("gasto_categoria").value,
+                monto: parseFloat(document.getElementById("gasto_monto").value),
+                descripcion: document.getElementById("gasto_descripcion").value || null
+            };
+
+            const res = await fetch("/gastos/", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data)
+            });
+
+            if (res.ok) {
+                document.getElementById("form-gasto").reset();
+                document.getElementById("gasto_fecha").value = obtenerFechaLocal();
+                cargarGastos();
+            } else {
+                alert("Error al registrar el gasto");
+            }
+        }
+
+        async function cargarGastos() {
+            const tipo = document.getElementById("filtro-gasto-tipo").value;
+            let url = `/gastos/?filtro_tipo=${tipo}`;
+
+            if (tipo === "dia") {
+                const fecha = document.getElementById("filtro-input-fecha")?.value || obtenerFechaLocal();
+                url += `&fecha_ref=${fecha}`;
+            } else if (tipo === "mes") {
+                const mes = document.getElementById("filtro-mes")?.value || new Date().getMonth() + 1;
+                const anio = document.getElementById("filtro-anio")?.value || new Date().getFullYear();
+                url += `&mes=${mes}&anio=${anio}`;
+            } else if (tipo === "anio") {
+                const anio = document.getElementById("filtro-anio")?.value || new Date().getFullYear();
+                url += `&anio=${anio}`;
+            }
+
+            const resGastos = await fetch(url);
+            const gastos = await resGastos.json();
+            const tbody = document.getElementById("tabla-gastos");
+
+            if (gastos.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-stone-400">No hay gastos registrados.</td></tr>`;
+            } else {
+                tbody.innerHTML = "";
+                gastos.forEach(g => {
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-stone-50 transition">
+                            <td class="py-2.5 px-2">${g.fecha}</td>
+                            <td class="py-2.5 px-2 font-medium"><span class="px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-800">${g.categoria}</span></td>
+                            <td class="py-2.5 px-2 text-stone-500">${g.descripcion || '-'}</td>
+                            <td class="py-2.5 px-2 text-right font-semibold text-rose-700">-$${g.monto.toFixed(2)}</td>
+                        </tr>
+                    `;
+                });
+            }
+
+            const resBalance = await fetch(`/balance-financiero/?filtro_tipo=${tipo}`);
+            const balance = await resBalance.json();
+
+            document.getElementById("bal-ingresos").textContent = `$${balance.total_ingresos.toFixed(2)}`;
+            document.getElementById("bal-gastos").textContent = `$${balance.total_gastos.toFixed(2)}`;
+            
+            const elNeto = document.getElementById("bal-neto");
+            elNeto.textContent = `$${balance.ganancia_neta.toFixed(2)}`;
+            elNeto.className = balance.ganancia_neta >= 0 ? "text-base font-bold text-emerald-800" : "text-base font-bold text-rose-800";
+        }
+    </script>
+
+</body>
+</html>

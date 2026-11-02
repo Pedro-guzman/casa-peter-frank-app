@@ -1,0 +1,508 @@
+from fastapi import FastAPI, Depends, status, Query, HTTPException, Response
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.requests import Request
+from sqlalchemy.orm import Session
+from datetime import datetime, timedelta, date
+from database import get_db, SessionLocal, engine, Base
+from models import BarberoModel, ServicioCatalogoModel, ServicioDiarioModel, CitaModel, GastoModel
+from pydantic import BaseModel
+from typing import Optional, List
+import io
+import csv
+
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="Casa Peter Frank")
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
+
+class ServicioDiarioCreate(BaseModel):
+    cliente_nombre: str
+    barbero_id: int
+    servicio_id: int
+    metodo_pago: str
+    precio_cobrado: float
+    fecha_hora: Optional[datetime] = None
+
+class CitaCreate(BaseModel):
+    cliente_nombre: str
+    fecha: str  # YYYY-MM-DD
+    hora: str   # HH:MM
+    anticipo: Optional[str] = "No"
+    barbero_id: Optional[int] = None
+    servicio_id: Optional[int] = None
+    metodo_pago: Optional[str] = None
+    precio_cobrado: Optional[float] = None
+
+@app.on_event("startup")
+def startup_event():
+    db = SessionLocal()
+    try:
+        if db.query(BarberoModel).count() == 0:
+            for b in ["Peter", "Frank"]:
+                db.add(BarberoModel(nombre=b))
+        if db.query(ServicioCatalogoModel).count() == 0:
+            for s in ["Corte", "Corte + barba", "Corte + barba + ceja", "Corte + ceja", "Barba + ceja", "Corte a tijera", "Tapper"]:
+                db.add(ServicioCatalogoModel(nombre_servicio=s))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+    finally:
+        db.close()
+
+@app.get("/", include_in_schema=False)
+def redirectToApp():
+    return RedirectResponse(url="/app")
+
+@app.get("/app", response_class=HTMLResponse)
+def read_root(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+@app.get("/barberos/")
+def listar_barberos(db: Session = Depends(get_db)):
+    return db.query(BarberoModel).all()
+
+@app.get("/servicios-catalogo/")
+def listar_catalogo(db: Session = Depends(get_db)):
+    return db.query(ServicioCatalogoModel).all()
+
+# --- SERVICIOS DIARIOS ---
+
+@app.post("/servicios-diarios/", status_code=status.HTTP_201_CREATED)
+def crear_servicio_diario(servicio: ServicioDiarioCreate, db: Session = Depends(get_db)):
+    neto = servicio.precio_cobrado
+    if servicio.metodo_pago.lower() == "tarjeta":
+        neto = servicio.precio_cobrado * (1 - 0.04)
+
+    nuevo_registro = ServicioDiarioModel(
+        cliente_nombre=servicio.cliente_nombre,
+        barbero_id=servicio.barbero_id,
+        servicio_id=servicio.servicio_id,
+        metodo_pago=servicio.metodo_pago,
+        precio_cobrado=servicio.precio_cobrado,
+        total_cobrado_neto=round(neto, 2),
+        fecha_hora=servicio.fecha_hora if servicio.fecha_hora else datetime.utcnow()
+    )
+    db.add(nuevo_registro)
+    db.commit()
+    db.refresh(nuevo_registro)
+    return {"mensaje": "Registrado con éxito", "total_cobrado_neto": nuevo_registro.total_cobrado_neto, "id": nuevo_registro.id}
+
+@app.put("/servicios-diarios/{id}")
+def editar_servicio_diario(id: int, servicio: ServicioDiarioCreate, db: Session = Depends(get_db)):
+    reg = db.query(ServicioDiarioModel).filter_by(id=id).first()
+    if not reg:
+        raise HTTPException(status_code=404, detail="Registro no encontrado")
+
+    neto = servicio.precio_cobrado
+    if servicio.metodo_pago.lower() == "tarjeta":
+        neto = servicio.precio_cobrado * (1 - 0.04)
+
+    reg.cliente_nombre = servicio.cliente_nombre
+    reg.barbero_id = servicio.barbero_id
+    reg.servicio_id = servicio.servicio_id
+    reg.metodo_pago = servicio.metodo_pago
+    reg.precio_cobrado = servicio.precio_cobrado
+    reg.total_cobrado_neto = round(neto, 2)
+    if servicio.fecha_hora:
+        reg.fecha_hora = servicio.fecha_hora
+
+    db.commit()
+    return {"mensaje": "Registro actualizado con éxito"}
+
+@app.get("/servicios-diarios/")
+def listar_servicios_diarios(
+    db: Session = Depends(get_db),
+    filtro_tipo: Optional[str] = Query(None),
+    fecha_ref: Optional[str] = Query(None),
+    mes: Optional[int] = Query(None),
+    anio: Optional[int] = Query(None)
+):
+    query = db.query(ServicioDiarioModel)
+    resultados = query.all()
+    ref_date = datetime.strptime(fecha_ref, "%Y-%m-%d") if fecha_ref else datetime.utcnow()
+
+    datos_formateados = []
+    for reg in resultados:
+        if filtro_tipo == "dia":
+            if fecha_ref:
+                if reg.fecha_hora.strftime("%Y-%m-%d") != fecha_ref: continue
+            else:
+                if reg.fecha_hora.strftime("%Y-%m-%d") != datetime.utcnow().strftime("%Y-%m-%d"): continue
+        elif filtro_tipo == "semana":
+            start_week = ref_date - timedelta(days=ref_date.weekday())
+            end_week = start_week + timedelta(days=6)
+            if not (start_week.date() <= reg.fecha_hora.date() <= end_week.date()): continue
+        elif filtro_tipo == "mes":
+            m = mes if mes else ref_date.month
+            a = anio if anio else ref_date.year
+            if reg.fecha_hora.month != m or reg.fecha_hora.year != a: continue
+        elif filtro_tipo == "anio":
+            a = anio if anio else ref_date.year
+            if reg.fecha_hora.year != a: continue
+        elif mes and reg.fecha_hora.month != mes: continue
+        elif anio and reg.fecha_hora.year != anio: continue
+            
+        barbero = db.query(BarberoModel).filter_by(id=reg.barbero_id).first()
+        servicio = db.query(ServicioCatalogoModel).filter_by(id=reg.servicio_id).first()
+        
+        datos_formateados.append({
+            "id": reg.id,
+            "fecha_hora": reg.fecha_hora.strftime("%Y-%m-%d %H:%M"),
+            "cliente_nombre": reg.cliente_nombre,
+            "barbero_id": reg.barbero_id,
+            "barbero": barbero.nombre if barbero else "Desconocido",
+            "servicio_id": reg.servicio_id,
+            "servicio": servicio.nombre_servicio if servicio else "Desconocido",
+            "metodo_pago": reg.metodo_pago,
+            "precio_cobrado": reg.precio_cobrado,
+            "total_cobrado_neto": reg.total_cobrado_neto
+        })
+    return datos_formateados
+
+# --- CITAS ---
+
+def obtener_horarios_dia(fecha_str: str):
+    dt = datetime.strptime(fecha_str, "%Y-%m-%d")
+    dia_semana = dt.weekday() # 0=Lun, 1=Mar, 2=Mié, 3=Jue, 4=Vie, 5=Sáb, 6=Dom
+
+    # Lunes(0), Martes(1), Jueves(3), Viernes(4)
+    if dia_semana in [0, 1, 3, 4]:
+        return ["09:00", "09:40", "10:20", "11:00", "11:40", "12:20", "15:40", "16:20", "17:00", "17:40", "18:20", "19:00"]
+    # Miércoles(2)
+    elif dia_semana == 2:
+        return ["09:00", "09:40", "10:20", "11:00", "11:40", "12:20"]
+    # Sábado(5) - Iniciando 8:00 AM y extendido hasta 5:20 PM (17:20)
+    elif dia_semana == 5:
+        return ["08:00", "08:40", "09:20", "10:00", "10:40", "11:20", "12:00", "14:00", "14:40", "15:20", "16:00", "16:40", "17:20"]
+    # Domingo(6) - Iniciando 8:00 AM
+    elif dia_semana == 6:
+        return ["08:00", "08:40", "09:20", "10:00", "10:40", "11:20", "12:00"]
+    return []
+
+@app.get("/citas-disponibilidad/")
+def consultar_disponibilidad(fecha: str, response: Response, db: Session = Depends(get_db)):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+
+    horarios = obtener_horarios_dia(fecha)
+    if not horarios:
+        return {"mensaje": "La barbería permanece cerrada este día.", "bloques": []}
+
+    barberos = db.query(BarberoModel).all()
+    citas_existentes = db.query(CitaModel).filter_by(fecha=fecha).all()
+
+    reporte_bloques = []
+    for hora in horarios:
+        espacios = [{"barbero_id": b.id, "barbero_nombre": b.nombre, "ocupado": False, "cliente": None, "anticipo": None, "cita_id": None, "servicio_id": None, "metodo_pago": None, "precio_cobrado": None} for b in barberos]
+        
+        for cita in citas_existentes:
+            if cita.hora == hora:
+                if cita.barbero_id:
+                    for esp in espacios:
+                        if esp["barbero_id"] == cita.barbero_id and not esp["ocupado"]:
+                            esp["ocupado"] = True
+                            esp["cliente"] = cita.cliente_nombre
+                            esp["anticipo"] = cita.anticipo
+                            esp["cita_id"] = cita.id
+                            esp["servicio_id"] = cita.servicio_id
+                            esp["metodo_pago"] = cita.metodo_pago
+                            esp["precio_cobrado"] = cita.precio_cobrado
+                            break
+                else:
+                    for esp in espacios:
+                        if not esp["ocupado"]:
+                            esp["ocupado"] = True
+                            esp["cliente"] = cita.cliente_nombre
+                            esp["anticipo"] = cita.anticipo
+                            esp["cita_id"] = cita.id
+                            esp["servicio_id"] = cita.servicio_id
+                            esp["metodo_pago"] = cita.metodo_pago
+                            esp["precio_cobrado"] = cita.precio_cobrado
+                            break
+
+        reporte_bloques.append({"hora": hora, "espacios": espacios})
+
+    return {"fecha": fecha, "bloques": reporte_bloques}
+
+@app.post("/citas/", status_code=status.HTTP_201_CREATED)
+def agendar_cita(cita: CitaCreate, db: Session = Depends(get_db)):
+    horarios = obtener_horarios_dia(cita.fecha)
+    if cita.hora not in horarios:
+        raise HTTPException(status_code=400, detail="Horario no válido o fuera de servicio.")
+
+    citas_en_hora = db.query(CitaModel).filter_by(fecha=cita.fecha, hora=cita.hora).all()
+    if len(citas_en_hora) >= 2:
+        raise HTTPException(status_code=400, detail="Este horario ya está completamente lleno.")
+
+    if cita.barbero_id:
+        if any(c.barbero_id == cita.barbero_id for c in citas_en_hora):
+            raise HTTPException(status_code=400, detail="El barbero seleccionado ya tiene cita a esta hora.")
+    else:
+        barberos_ocupados = [c.barbero_id for c in citas_en_hora if c.barbero_id]
+        todos_barberos = db.query(BarberoModel).all()
+        libre = next((b for b in todos_barberos if b.id not in barberos_ocupados), None)
+        if libre:
+            cita.barbero_id = libre.id
+        else:
+            cita.barbero_id = todos_barberos[0].id if todos_barberos else 1
+
+    # Sincronización automática con ingresos diarios si se incluye pago/servicio
+    servicio_diario_id = None
+    if cita.servicio_id and cita.precio_cobrado is not None and cita.metodo_pago:
+        neto = cita.precio_cobrado
+        if cita.metodo_pago.lower() == "tarjeta":
+            neto = cita.precio_cobrado * (1 - 0.04)
+        
+        # Combinar fecha y hora para el registro diario
+        try:
+            dt_completa = datetime.strptime(f"{cita.fecha} {cita.hora}", "%Y-%m-%d %H:%M")
+        except Exception:
+            dt_completa = datetime.utcnow()
+
+        barbero_ingreso_id = cita.barbero_id
+        if not barbero_ingreso_id:
+            todos_barberos = db.query(BarberoModel).all()
+            barbero_ingreso_id = todos_barberos[0].id if todos_barberos else 1
+
+        nuevo_ingreso = ServicioDiarioModel(
+            cliente_nombre=cita.cliente_nombre,
+            barbero_id=barbero_ingreso_id,
+            servicio_id=cita.servicio_id,
+            metodo_pago=cita.metodo_pago,
+            precio_cobrado=cita.precio_cobrado,
+            total_cobrado_neto=round(neto, 2),
+            fecha_hora=dt_completa
+        )
+        db.add(nuevo_ingreso)
+        db.commit()
+        db.refresh(nuevo_ingreso)
+        servicio_diario_id = nuevo_ingreso.id
+
+    nueva_cita = CitaModel(
+        cliente_nombre=cita.cliente_nombre,
+        fecha=cita.fecha,
+        hora=cita.hora,
+        anticipo=cita.anticipo if cita.anticipo else "No",
+        barbero_id=cita.barbero_id,
+        servicio_id=cita.servicio_id,
+        metodo_pago=cita.metodo_pago,
+        precio_cobrado=cita.precio_cobrado,
+        servicio_diario_id=servicio_diario_id
+    )
+    db.add(nueva_cita)
+    db.commit()
+    db.refresh(nueva_cita)
+
+    return {"mensaje": "Cita agendada con éxito", "cita_id": nueva_cita.id}
+
+@app.put("/citas/{id}")
+def editar_cita(id: int, cita: CitaCreate, db: Session = Depends(get_db)):
+    reg = db.query(CitaModel).filter_by(id=id).first()
+    if not reg:
+        raise HTTPException(status_code=404, detail="Cita no encontrada")
+
+    reg.cliente_nombre = cita.cliente_nombre
+    reg.fecha = cita.fecha
+    reg.hora = cita.hora
+    if cita.anticipo is not None:
+        reg.anticipo = cita.anticipo
+
+    # Si se envía barbero_id, actualizarlo; si es None, conservar el existente o asignar uno
+    if cita.barbero_id:
+        reg.barbero_id = cita.barbero_id
+    elif not reg.barbero_id:
+        todos_barberos = db.query(BarberoModel).all()
+        if todos_barberos:
+            reg.barbero_id = todos_barberos[0].id
+
+    if cita.servicio_id:
+        reg.servicio_id = cita.servicio_id
+    if cita.metodo_pago:
+        reg.metodo_pago = cita.metodo_pago
+    if cita.precio_cobrado is not None:
+        reg.precio_cobrado = cita.precio_cobrado
+
+    # Sincronizar o actualizar el registro financiero asociado
+    if reg.servicio_id and reg.precio_cobrado is not None and reg.metodo_pago:
+        neto = reg.precio_cobrado
+        if reg.metodo_pago.lower() == "tarjeta":
+            neto = reg.precio_cobrado * (1 - 0.04)
+        
+        try:
+            dt_completa = datetime.strptime(f"{reg.fecha} {reg.hora}", "%Y-%m-%d %H:%M")
+        except Exception:
+            dt_completa = datetime.utcnow()
+
+        barbero_asociado_id = reg.barbero_id
+        if not barbero_asociado_id:
+            todos_barberos = db.query(BarberoModel).all()
+            barbero_asociado_id = todos_barberos[0].id if todos_barberos else 1
+            reg.barbero_id = barbero_asociado_id
+
+        if reg.servicio_diario_id:
+            ingreso_reg = db.query(ServicioDiarioModel).filter_by(id=reg.servicio_diario_id).first()
+            if ingreso_reg:
+                ingreso_reg.cliente_nombre = reg.cliente_nombre
+                ingreso_reg.barbero_id = barbero_asociado_id
+                ingreso_reg.servicio_id = reg.servicio_id
+                ingreso_reg.metodo_pago = reg.metodo_pago
+                ingreso_reg.precio_cobrado = reg.precio_cobrado
+                ingreso_reg.total_cobrado_neto = round(neto, 2)
+                ingreso_reg.fecha_hora = dt_completa
+            else:
+                nuevo_ingreso = ServicioDiarioModel(
+                    cliente_nombre=reg.cliente_nombre,
+                    barbero_id=barbero_asociado_id,
+                    servicio_id=reg.servicio_id,
+                    metodo_pago=reg.metodo_pago,
+                    precio_cobrado=reg.precio_cobrado,
+                    total_cobrado_neto=round(neto, 2),
+                    fecha_hora=dt_completa
+                )
+                db.add(nuevo_ingreso)
+                db.commit()
+                db.refresh(nuevo_ingreso)
+                reg.servicio_diario_id = nuevo_ingreso.id
+        else:
+            nuevo_ingreso = ServicioDiarioModel(
+                cliente_nombre=reg.cliente_nombre,
+                barbero_id=barbero_asociado_id,
+                servicio_id=reg.servicio_id,
+                metodo_pago=reg.metodo_pago,
+                precio_cobrado=reg.precio_cobrado,
+                total_cobrado_neto=round(neto, 2),
+                fecha_hora=dt_completa
+            )
+            db.add(nuevo_ingreso)
+            db.commit()
+            db.refresh(nuevo_ingreso)
+            reg.servicio_diario_id = nuevo_ingreso.id
+
+    db.commit()
+    return {"mensaje": "Cita actualizada con éxito"}
+
+@app.delete("/citas/{id}")
+def cancelar_cita(id: int, db: Session = Depends(get_db)):
+    reg = db.query(CitaModel).filter_by(id=id).first()
+    if not reg:
+        raise HTTPException(status_code=404, detail="Cita no encontrada")
+    
+    # Opcional: si tenía un registro financiero asociado al cancelarse, puedes decidir si dejarlo o quitarlo. 
+    # Por seguridad contable, lo dejamos intacto en ingresos diarios a menos que se borre manualmente.
+    db.delete(reg)
+    db.commit()
+    return {"mensaje": "Cita cancelada con éxito"}
+
+@app.get("/exportar-csv/")
+def exportar_csv(db: Session = Depends(get_db)):
+    try:
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["ID", "Fecha y Hora", "Cliente", "Barbero", "Servicio", "Método de Pago", "Precio Cobrado", "Total Neto"])
+        
+        registros = db.query(ServicioDiarioModel).all()
+        for reg in registros:
+            barbero = db.query(BarberoModel).filter_by(id=reg.barbero_id).first() if reg.barbero_id else None
+            servicio = db.query(ServicioCatalogoModel).filter_by(id=reg.servicio_id).first() if reg.servicio_id else None
+            
+            fecha_str = ""
+            if reg.fecha_hora:
+                try:
+                    fecha_str = reg.fecha_hora.strftime("%Y-%m-%d %H:%M")
+                except Exception:
+                    fecha_str = str(reg.fecha_hora)
+            
+            writer.writerow([
+                reg.id, fecha_str, reg.cliente_nombre or "Sin nombre",
+                barbero.nombre if barbero else "Desconocido",
+                servicio.nombre_servicio if servicio else "Desconocido",
+                reg.metodo_pago or "Efectivo",
+                reg.precio_cobrado or 0.0, reg.total_cobrado_neto or 0.0
+            ])
+        output.seek(0)
+        return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=reporte_casa_peter_frank.csv"})
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+# Esquema Pydantic para validar la entrada de gastos
+class GastoSchema(BaseModel):
+    fecha: str
+    categoria: str
+    monto: float
+    descripcion: Optional[str] = None
+
+@app.post("/gastos/")
+def crear_gasto(gasto: GastoSchema, db: Session = Depends(get_db)):
+    nuevo_gasto = GastoModel(
+        fecha=gasto.fecha,
+        categoria=gasto.categoria,
+        monto=gasto.monto,
+        descripcion=gasto.descripcion
+    )
+    db.add(nuevo_gasto)
+    db.commit()
+    db.refresh(nuevo_gasto)
+    return {"mensaje": "Gasto registrado con éxito", "id": nuevo_gasto.id}
+
+@app.get("/gastos/")
+def listar_gastos(
+    filtro_tipo: str = "todos",
+    fecha_ref: Optional[str] = None,
+    mes: Optional[int] = None,
+    anio: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    query = db.query(GastoModel)
+    
+    if filtro_tipo == "dia" and fecha_ref:
+        query = query.filter(GastoModel.fecha == fecha_ref)
+    elif filtro_tipo == "mes" and mes and anio:
+        mes_str = f"{anio}-{str(mes).zfill(2)}"
+        query = query.filter(GastoModel.fecha.like(f"{mes_str}%"))
+    elif filtro_tipo == "anio" and anio:
+        query = query.filter(GastoModel.fecha.like(f"{anio}%"))
+        
+    return query.all()
+
+@app.get("/balance-financiero/")
+def obtener_balance_financiero(
+    filtro_tipo: str = "todos",
+    fecha_ref: Optional[str] = None,
+    mes: Optional[int] = None,
+    anio: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    # 1. Calcular Total de Gastos filtrados
+    query_gastos = db.query(GastoModel)
+    if filtro_tipo == "dia" and fecha_ref:
+        query_gastos = query_gastos.filter(GastoModel.fecha == fecha_ref)
+    elif filtro_tipo == "mes" and mes and anio:
+        mes_str = f"{anio}-{str(mes).zfill(2)}"
+        query_gastos = query_gastos.filter(GastoModel.fecha.like(f"{mes_str}%"))
+    elif filtro_tipo == "anio" and anio:
+        query_gastos = query_gastos.filter(GastoModel.fecha.like(f"{anio}%"))
+    
+    total_gastos = sum(g.monto for g in query_gastos.all())
+
+    # 2. Calcular Total de Ingresos Netos (reutilizando la misma lógica de servicios)
+    query_ingresos = db.query(ServicioDiarioModel)
+    if filtro_tipo == "dia" and fecha_ref:
+        query_ingresos = query_ingresos.filter(ServicioDiarioModel.fecha_hora.like(f"{fecha_ref}%"))
+    elif filtro_tipo == "mes" and mes and anio:
+        mes_str = f"{anio}-{str(mes).zfill(2)}"
+        query_ingresos = query_ingresos.filter(ServicioDiarioModel.fecha_hora.like(f"{mes_str}%"))
+    elif filtro_tipo == "anio" and anio:
+        query_ingresos = query_ingresos.filter(ServicioDiarioModel.fecha_hora.like(f"{anio}%"))
+
+    total_ingresos = sum(s.total_cobrado_neto for s in query_ingresos.all())
+    ganancia_neta = total_ingresos - total_gastos
+
+    return {
+        "total_ingresos": total_ingresos,
+        "total_gastos": total_gastos,
+        "ganancia_neta": ganancia_neta
+    }

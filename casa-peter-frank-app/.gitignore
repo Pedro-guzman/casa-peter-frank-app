@@ -1,0 +1,19 @@
+# Entorno virtual
+.venv/
+venv/
+ENV/
+
+# Base de datos local SQLite (en producción en la nube usaremos Neon)
+*.db
+*.sqlite3
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Configuración local de entorno
+.env
+
+# Archivos de Mac
+.DS_Store
