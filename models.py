@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean
 from sqlalchemy.sql import func
 from database import Base
 
@@ -46,3 +46,10 @@ class GastoModel(Base):
     categoria = Column(String, index=True)      # Personal, Renta, Luz, etc.
     monto = Column(Float)
     descripcion = Column(String, nullable=True)
+
+class HorarioExcepcionModel(Base):
+    __tablename__ = "horarios_excepciones"
+    id = Column(Integer, primary_key=True, index=True)
+    fecha = Column(String, index=True)  # YYYY-MM-DD
+    hora = Column(String)               # HH:MM
+    activo = Column(Boolean, default=True)

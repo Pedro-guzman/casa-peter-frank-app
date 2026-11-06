@@ -6,7 +6,7 @@ from fastapi.requests import Request
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, date
 from database import get_db, SessionLocal, engine, Base
-from models import BarberoModel, ServicioCatalogoModel, ServicioDiarioModel, CitaModel, GastoModel
+from models import BarberoModel, ServicioCatalogoModel, ServicioDiarioModel, CitaModel, GastoModel, HorarioExcepcionModel
 from pydantic import BaseModel
 from typing import Optional, List
 from pydantic import BaseModel
@@ -36,6 +36,10 @@ class CitaCreate(BaseModel):
     servicio_id: Optional[int] = None
     metodo_pago: Optional[str] = None
     precio_cobrado: Optional[float] = None
+
+class HorarioExtraCreate(BaseModel):
+    fecha: str
+    hora: str # Formato "HH:MM"
 
 @app.on_event("startup")
 def startup_event():
@@ -185,8 +189,14 @@ def obtener_horarios_dia(fecha_str: str):
 
 @app.get("/citas-disponibilidad/")
 def consultar_disponibilidad(fecha: str, db: Session = Depends(get_db)):
+    # 1. Obtener horarios base del día y fusionarlos con los horarios extra habilitados
+    horarios_base = obtener_horarios_dia(fecha)
+    excepciones_db = db.query(HorarioExcepcionModel).filter_by(fecha=fecha, activo=True).all()
+    horas_extra = [ex.hora for ex in excepciones_db]
 
-    horarios = obtener_horarios_dia(fecha)
+    # Combinar y ordenar cronológicamente sin duplicados
+    horarios = sorted(list(set(horarios_base + horas_extra)))
+
     if not horarios:
         return {"mensaje": "La barbería permanece cerrada este día.", "bloques": []}
 
@@ -228,7 +238,12 @@ def consultar_disponibilidad(fecha: str, db: Session = Depends(get_db)):
 
 @app.post("/citas/", status_code=status.HTTP_201_CREATED)
 def agendar_cita(cita: CitaCreate, db: Session = Depends(get_db)):
-    horarios = obtener_horarios_dia(cita.fecha)
+    # 1. Validar contra horarios base y horarios extra permitidos para esa fecha
+    horarios_base = obtener_horarios_dia(cita.fecha)
+    excepciones_db = db.query(HorarioExcepcionModel).filter_by(fecha=cita.fecha, activo=True).all()
+    horas_extra = [ex.hora for ex in excepciones_db]
+    horarios = sorted(list(set(horarios_base + horas_extra)))
+
     if cita.hora not in horarios:
         return {"error": "Horario no válido o fuera de servicio."}, 400
 
@@ -291,6 +306,7 @@ def agendar_cita(cita: CitaCreate, db: Session = Depends(get_db)):
     db.refresh(nueva_cita)
 
     return {"mensaje": "Cita agendada con éxito", "cita_id": nueva_cita.id}
+
 
 @app.put("/citas/{id}")
 def editar_cita(id: int, cita: CitaCreate, db: Session = Depends(get_db)):
@@ -467,3 +483,23 @@ def obtener_balance_financiero(
         "total_gastos": total_gastos,
         "ganancia_neta": ganancia_neta
     }
+
+@app.post("/horarios-extra/", status_code=status.HTTP_201_CREATED)
+def agregar_horario_extra(item: HorarioExtraCreate, db: Session = Depends(get_db)):
+    # Verificar si ya existe este horario extra para la fecha
+    existente = db.query(HorarioExcepcionModel).filter_by(fecha=item.fecha, hora=item.hora).first()
+    if existente:
+        existente.activo = True
+    else:
+        nuevo = HorarioExcepcionModel(fecha=item.fecha, hora=item.hora, activo=True)
+        db.add(nuevo)
+    db.commit()
+    return {"mensaje": "Horario extraordinario habilitado con éxito"}
+
+@app.delete("/horarios-extra/")
+def eliminar_horario_extra(fecha: str, hora: str, db: Session = Depends(get_db)):
+    excepcion = db.query(HorarioExcepcionModel).filter_by(fecha=fecha, hora=hora).first()
+    if excepcion:
+        db.delete(excepcion)
+        db.commit()
+    return {"mensaje": "Horario extraordinario removido"}

@@ -6,7 +6,7 @@
     <title>Casa Peter Frank - Sistema de Gestión</title>
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- Favicon de la aplicación -->
+    <!-- Favicon -->
     <link rel="icon" type="image/jpeg" href="../static/logo.jpeg">
 </head>
 <body class="bg-stone-50 text-stone-800 font-sans antialiased min-h-screen flex flex-col justify-between">
@@ -232,6 +232,17 @@
 
             <!-- Visualización de Disponibilidad por Día -->
             <section class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm md:col-span-2">
+                <!-- PANEL DE GESTIÓN DE HORARIOS EXTRAORDINARIOS -->
+            <div class="bg-stone-100 border border-stone-200 rounded-xl p-3 mb-4 text-xs space-y-2">
+                <div class="font-semibold text-stone-800 flex items-center justify-between">
+                    <span> Agrega aquí Horarios Extra (Días de Alta Demanda)</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <input type="time" id="nuevo_horario_extra" class="px-2 py-1 rounded border border-stone-300 bg-white text-xs">
+                    <button onclick="habilitarHorarioExtra()" class="bg-stone-900 text-white px-3 py-1 rounded font-medium hover:bg-stone-800 transition">Agregar Horario</button>
+                </div>
+            </div>
+
                 <div class="sticky top-20 bg-white/95 backdrop-blur z-20 pb-4 mb-4 border-b border-stone-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
                         <h2 class="text-base font-medium text-stone-900">Disponibilidad de Citas</h2>
@@ -965,6 +976,33 @@
             elNeto.textContent = `$${balance.ganancia_neta.toFixed(2)}`;
             elNeto.className = balance.ganancia_neta >= 0 ? "text-base font-bold text-emerald-800" : "text-base font-bold text-rose-800";
         }
+
+        async function habilitarHorarioExtra() {
+            const fecha = document.getElementById("filtro-fecha-citas").value;
+            const horaInput = document.getElementById("nuevo_horario_extra").value;
+
+            if (!fecha || !horaInput) {
+                alert("Selecciona una fecha y una hora válida.");
+                return;
+            }
+
+            // Asegurar formato HH:MM
+            const horaFormateada = horaInput.length === 5 ? horaInput : horaInput + ":00";
+
+            const res = await fetch("/horarios-extra/", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ fecha: fecha, hora: horaFormateada })
+            });
+
+            if (res.ok) {
+                document.getElementById("nuevo_horario_extra").value = "";
+                cargarDisponibilidadDia(); // Refresca la agenda al instante con el nuevo horario
+            } else {
+                alert("Error al agregar el horario extra.");
+            }
+        }
+
     </script>
 
 </body>
