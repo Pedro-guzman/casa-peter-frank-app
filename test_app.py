@@ -173,6 +173,26 @@ class TestCasaPeterFrank(unittest.TestCase):
         self.assertEqual(ingreso.total_cobrado_neto, 250.0)
         self.assertEqual(ingreso.metodo_pago, "Transferencia")
 
+    def test_agendar_cita_con_anticipo(self):
+        """Agendar cita con anticipo y verificar persistencia y retorno en disponibilidad"""
+        barbero = self.db.query(BarberoModel).first()
+        resp = main.agendar_cita(
+            CitaCreate(
+                cliente_nombre="Roberto Gomez",
+                fecha="2026-11-09",
+                hora="10:20",
+                anticipo="$150 en efectivo",
+                barbero_id=barbero.id
+            ),
+            db=self.db
+        )
+        cita_id = resp["cita_id"]
+        disp = main.consultar_disponibilidad("2026-11-09", db=self.db)
+        bloque_1020 = next(b for b in disp["bloques"] if b["hora"] == "10:20")
+        espacio_ocupado = next(e for e in bloque_1020["espacios"] if e["ocupado"])
+        self.assertEqual(espacio_ocupado["anticipo"], "$150 en efectivo")
+        self.assertEqual(espacio_ocupado["cliente"], "Roberto Gomez")
+
     def test_agendar_cita_fuera_de_horario_arroja_http_exception(self):
         """Validar que agendar fuera de horario arroja HTTPException 400 y no tupla 200"""
         barbero = self.db.query(BarberoModel).first()

@@ -864,12 +864,29 @@
                                 badgePago = `<div class="text-[10px] font-semibold ${badgePagoColor} px-1.5 py-0.5 rounded w-fit mt-0.5">Pagado: $${esp.precio_cobrado} (${escapeHtml(esp.metodo_pago)})</div>`;
                             }
 
+                            // Detección y diseño resaltado de Anticipo
+                            const anticipoRaw = (esp.anticipo || "").trim();
+                            const tieneAnticipo = anticipoRaw !== "" && 
+                                                  anticipoRaw.toLowerCase() !== "no" && 
+                                                  anticipoRaw.toLowerCase() !== "null";
+
+                            const badgeAnticipo = tieneAnticipo
+                                ? `<div class="inline-flex items-center gap-1.5 text-xs font-bold bg-amber-200 text-amber-950 border border-amber-400 px-2.5 py-1 rounded-md shadow-sm mt-1">
+                                       <span>💰 Anticipo:</span>
+                                       <span class="underline decoration-amber-600">${escapeHtml(esp.anticipo)}</span>
+                                   </div>`
+                                : `<div class="text-[10px] text-rose-700/70 mt-0.5">Anticipo: No</div>`;
+
+                            const miniFormAnticipoBadge = tieneAnticipo
+                                ? `<span class="text-[10px] font-bold text-amber-950 bg-amber-200 border border-amber-400 px-1.5 py-0.5 rounded shadow-xs">💰 Anticipo: ${escapeHtml(esp.anticipo)}</span>`
+                                : '';
+
                             htmlEspacios += `
                                 <div class="bg-rose-50 border border-rose-200 rounded-lg p-2.5 text-xs flex flex-col gap-2">
                                     <div class="flex justify-between items-center">
                                         <div>
                                             <span class="font-semibold text-rose-900">🔴 ${escapeHtml(esp.barbero_nombre)}: ${escapeHtml(esp.cliente)}</span>
-                                            <div class="text-[10px] text-rose-700">Anticipo: ${escapeHtml(esp.anticipo || 'No')}</div>
+                                            ${badgeAnticipo}
                                             ${badgePago}
                                         </div>
                                         <div class="flex items-center gap-1.5 flex-wrap justify-end">
@@ -883,7 +900,10 @@
                                     <div id="form-pago-rapido-${esp.cita_id}" class="hidden bg-white p-3 rounded-lg border border-stone-200 space-y-2 mt-1 shadow-inner">
                                         <p class="font-medium text-stone-900 text-[11px] border-b border-stone-100 pb-1 flex justify-between items-center">
                                             <span>Cobro de Cita: <strong>${escapeHtml(esp.cliente)}</strong></span>
-                                            <span class="text-[10px] text-stone-500">${escapeHtml(esp.barbero_nombre)}</span>
+                                            <span class="flex items-center gap-2">
+                                                ${miniFormAnticipoBadge}
+                                                <span class="text-[10px] text-stone-500">${escapeHtml(esp.barbero_nombre)}</span>
+                                            </span>
                                         </p>
                                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                             <div>
